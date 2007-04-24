@@ -1,12 +1,14 @@
-from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.http import HttpResponse, HttpResponseRedirect, get_host
 from django.shortcuts import render_to_response as render
 from django.template import RequestContext
 from django.conf import settings
 
-import md5, time
+import md5, re, time
 from openid.consumer.consumer import Consumer, \
     SUCCESS, CANCEL, FAILURE, SETUP_NEEDED
 from openid.consumer.discover import DiscoveryFailure
+from yadis import xri
+
 from util import OpenID, DjangoOpenIDStore, from_openid_response
 
 from django.utils.html import escape
@@ -16,7 +18,7 @@ def get_url_host(request):
         protocol = 'https'
     else:
         protocol = 'http'
-    host = escape(request.META['HTTP_HOST'])
+    host = escape(get_host(request))
     return '%s://%s' % (protocol, host)
 
 def get_full_url(request):
@@ -27,49 +29,58 @@ def get_full_url(request):
     host = escape(request.META['HTTP_HOST'])
     return get_url_host(request) + request.get_full_path()
 
-def is_valid_after_url(after):
-    # When we allow this:
-    #   /openid/?after=/welcome/
-    # For security reasons we want to restrict the after= bit to being a local 
-    # path, not a complete URL.
-    if not after.startswith('/'):
-        return False
-    if '://' in after:
-        return False
-    for c in after:
-        if c.isspace():
-            return False
-    return True
+next_url_re = re.compile('^/[-\w/]+$')
 
-def begin(request, sreg=None, extension_args=None):
+def is_valid_next_url(next):
+    # When we allow this:
+    #   /openid/?next=/welcome/
+    # For security reasons we want to restrict the next= bit to being a local 
+    # path, not a complete URL.
+    return bool(next_url_re.match(next))
+
+def begin(request, sreg=None, extension_args=None, redirect_to=None):
+    if request.GET.get('logo'):
+        # Makes for a better demo
+        return HttpResponse(
+            OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
+        )
+    
     extension_args = extension_args or {}
     if sreg:
         extension_args['sreg.optional'] = sreg
     trust_root = getattr(
         settings, 'OPENID_TRUST_ROOT', get_url_host(request) + '/'
     )
-    redirect_to = getattr(
+    redirect_to = redirect_to or getattr(
         settings, 'OPENID_REDIRECT_TO',
         # If not explicitly set, assume current URL with complete/ appended
         get_full_url(request).split('?')[0] + 'complete/'
     )
+    # In case they were lazy...
+    if not redirect_to.startswith('http://'):
+        redirect_to =  get_url_host(request) + redirect_to
     
-    if request.GET.get('after') and is_valid_after_url(request.GET['after']):
+    if request.GET.get('next') and is_valid_next_url(request.GET['next']):
         if '?' in redirect_to:
             join = '&'
         else:
             join = '?'
-        redirect_to += join + 'after=' + urllib.urlencode(request.GET['after'])
+        redirect_to += join + 'next=' + urllib.urlencode(request.GET['next'])
     
-    user_url = request.POST.get('openid_url', None)    
+    user_url = request.POST.get('openid_url', None)
     if not user_url:
-        return render('openid_signin.html')
+        return render('openid_signin.html', {'action': request.path})
+    
+    if xri.identifierScheme(user_url) == 'XRI' and getattr(
+        settings, 'OPENID_DISALLOW_INAMES', False
+        ):
+        return failure(request, 'i-names are not supported')
     
     consumer = Consumer(request.session, DjangoOpenIDStore())
     try:
         auth_request = consumer.begin(user_url)
     except DiscoveryFailure:
-        raise Http404, "Discovery failure"
+        return failure(request, "The OpenID was invalid")
     
     # Add extension args (for things like simple registration)
     for name, value in extension_args.items():
@@ -103,19 +114,30 @@ def success(request, identity_url, openid_response):
     ]
     request.session['openids'].append(from_openid_response(openid_response))
     
-    after = request.GET.get('after', '').strip()
-    if not after or not is_valid_after_url(after):
-        after = getattr(settings, 'OPENID_REDIRECT_AFTER', '/')
+    next = request.GET.get('next', '').strip()
+    if not next or not is_valid_next_url(next):
+        next = getattr(settings, 'OPENID_REDIRECT_NEXT', '/')
     
-    return HttpResponseRedirect(after)
+    return HttpResponseRedirect(next)
 
 def failure(request, message):
     return render('openid_failure.html', {
         'message': message
-    }) # , context_instance = RequestContext(request))
+    })
 
 def signout(request):
-    request.session.openids = []
-    request.session.openid = None
+    request.session['openids'] = []
     next = request.GET.get('next', '/')
+    if not is_valid_next_url(next):
+        next = '/'
     return HttpResponseRedirect(next)
+
+# Logo from http://openid.net/login-bg.gif
+# Embedded here for convenience; you should serve this as a static file
+OPENID_LOGO_BASE_64 = """
+R0lGODlhEAAQAMQAAO3t7eHh4srKyvz8/P5pDP9rENLS0v/28P/17tXV1dHEvPDw8M3Nzfn5+d3d
+3f5jA97Syvnv6MfLzcfHx/1mCPx4Kc/S1Pf189C+tP+xgv/k1N3OxfHy9NLV1/39/f///yH5BAAA
+AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
+EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
+Fzk0lpcjIQA7
+"""

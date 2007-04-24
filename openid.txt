@@ -1,0 +1,165 @@
+================
+OpenID in Django
+================
+
+The ``django_openidconsumer`` package contains all of the code needed to set up 
+your Django application as an OpenID consumer. You can use it to allow OpenID  
+users to sign in to your site without having to create a new username and 
+password.
+
+Overview
+========
+
+The OpenID consumer system consists of:
+
+    * Views for you to hook in to your application.
+    * Database models implementing the persistence layer of an OpenID consumer.
+    * Middleware that makes ``request.openid`` and ``request.openids`` 
+      properties available to your application views.
+
+Dependencies
+============
+
+``django_openidconsumer`` uses the `python-openid library`_, which must be 
+installed separately somewhere on the Python path. You should install the 1.2.0
+"combo" package which includes the ``yadis`` and ``urljr`` libraries.
+
+The package also depends on the availability of Django's `session support`_.
+
+.. _python-openid library: http://www.openidenabled.com/openid/libraries/python/
+.. _session support: http://www.djangoproject.com/documentation/sessions/
+
+Installation
+============
+
+Having ensured that both the  ``python-openid`` library and the ``django_openidconsumer`` package are available on your Python path, you can 
+add OpenID consumer support to an application by doing the following:
+
+    1. Put ``django_openidconsumer`` in your ``INSTALLED_APPS`` setting.
+    2. Run the command ``manage.py syncdb`` to create the necessary tables.
+    3. Add ``django_openidconsumer.middleware.OpenIDMiddleware`` to your list
+       of ``MIDDLEWARE_CLASSES``, somewhere after the Session middleware.
+    4. Add the following views to your urlconf::
+        
+        (r'^openid/$', 'django_openidconsumer.views.begin'),
+        (r'^openid/complete/$', 'django_openidconsumer.views.complete'),
+        (r'^openid/signout/$', 'django_openidconsumer.views.signout'),
+
+You will then be able to browse to ``example.com/openid/`` and sign in using 
+an OpenID.
+
+Using the OpenID middleware
+===========================
+
+With the Middleware installed, your views will have access to the user's OpenID
+as the ``request.openid`` property. This will be ``None`` if the user has not 
+yet authenticated; otherwise it will be a ``django_openidconsumer.util.OpenID`` 
+instance.
+
+If you want the user's OpenID as a string, call the ``str()`` builtin on the
+OpenID instance::
+
+    def example_view(request):
+        if request.openid:
+            return HttpResponse("OpenID is %s" % escape(str(request.openid)))
+        else:
+            return HttpResponse("No OpenID")
+
+Users can sign in with more than one OpenID. This is supported by the 
+``request.openids`` property, which is a list of ``OpenID`` objects in the order
+in which they were authenticated. ``request.openid`` merely returns the last 
+item in this list.
+
+Using simple registration
+=========================
+
+Simple registration (or `sreg`_) is an extension to the OpenID specification 
+that  allows you to request extra details about a user from their OpenID 
+provider. It is frequently used to pre-populate registration forms with 
+information such as the user's name, e-mail address or date of birth.
+
+.. _sreg: http://openid.net/specs/openid-simple-registration-extension-1_0.html
+
+Be aware that not all OpenID providers support sreg, and there is no guarantee
+that the information you have requested will be returned. Simple registration 
+should be used as a convenience for your users rather than as a required step in
+your authentication process.
+
+Available simple registration fields are ``nickname``, ``email``, ``fullname``,
+``dob``, ``gender``, ``postcode``, ``country``, ``language`` and ``timezone``. 
+Full details are available in the `spec`_.
+
+.. _spec: http://openid.net/specs/openid-simple-registration-extension-1_0.html
+
+To request this information, pass the fields that you wish to retrieve as an 
+additional ``sreg`` argument to the ``django_openidconsumer.views.begin`` view::
+
+    (r'^openid/$', 'django_openidconsumer.views.begin', {
+        'sreg': 'email,nickname'
+    }),
+
+Any simple registration fields that are returned will be available in a 
+dictionary as the ``sreg`` property of the OpenID object::
+
+    def example_sreg(request):
+        if request.openid and request.openid.sreg.has_key('email'):
+            return HttpResponse("Your e-mail address is: %s" % escape(
+                request.openid.sreg['email']
+            ))
+        else:
+            return HttpResponse("No e-mail address")
+
+Customisation
+=============
+
+``django_openidconsumer`` uses two templates:
+
+``openid_signin.html``
+    The form presented to the user when they sign in.
+
+``openid_failure.html``
+    The template used to display an error message when something goes wrong.
+
+You can over-ride the default templates by creating templates of the same name 
+and placing them somewhere on your template path. You can find the example 
+templates in the ``django_openidconsumer/templates`` directory.
+
+The OpenID specification strongly recommends that any OpenID registration form
+has a ``name`` attribute of ``openid_url`` to aid browser autocompletion, and 
+displays the `OpenID logo`_ inline in the form field using the following CSS::
+
+    input.openid {
+      background: url(/path/to/login-bg.gif) no-repeat; 
+      background-position: 0 50%;
+      padding-left: 16px;
+    }
+
+.. _OpenID logo: http://openid.net/login-bg.gif
+
+By default, the package expects the ``django_openidconsumer.views.complete`` 
+view to be located at ``/openid/complete/``. This is the view that the OpenID 
+provider will redirect the user to after they have authenticated. If you want to
+put it somewhere else you can either pass an extra ``redirect_to`` argument to  
+``django_openidconsumer.views.begin`` or add an ``OPENID_REDIRECT_TO`` setting 
+to ``settings.py``.
+
+You can pass a ``?next=`` query string argument containing a relative URL to 
+the ``begin`` view to control where the user will be redirected to having 
+returned to your site. You can also set the default redirection location 
+using the ``OPENID_REDIRECT_NEXT`` setting; if you do set set a default the user
+will be redirected to your homepage.
+
+i-names
+=======
+
+`i-names`_ are part of the OpenID 2.0 specification, which is currently being 
+developed. They are supported by the python-openid library, and hence are also 
+supported by ``django_openidconsumer``. You can tell if an OpenID is an i-name 
+by checking the ``request.openid.is_iname`` property.
+
+.. _i-names: http://www.inames.net/
+
+If you wish to disable i-name support, you can do so by adding the following to
+your ``settings.py``::
+
+    OPENID_DISALLOW_INAMES = True

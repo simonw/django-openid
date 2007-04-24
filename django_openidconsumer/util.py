@@ -1,5 +1,7 @@
 from openid.store.interface import OpenIDStore
 from openid.association import Association as OIDAssociation
+from yadis import xri
+
 import time, base64, md5
 
 from django.conf import settings
@@ -11,8 +13,11 @@ class OpenID:
         self.issued = issued
         self.attrs = attrs or {}
         self.sreg = sreg or {}
+        self.is_iname = (xri.identifierScheme(openid) == 'XRI')
+    
     def __repr__(self):
         return '<OpenID: %s>' % self.openid
+    
     def __str__(self):
         return self.openid
 

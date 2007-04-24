@@ -1,0 +1,142 @@
+<p>The <tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt> package contains all of the code needed to set up
+your Django application as an OpenID consumer. You can use it to allow OpenID
+users to sign in to your site without having to create a new username and
+password.</p>
+<div class="section">
+<h2><a id="overview">Overview</a></h2>
+<p>The OpenID consumer system consists of:</p>
+<ul class="simple">
+<li>Views for you to hook in to your application.</li>
+<li>Database models implementing the persistence layer of an OpenID consumer.</li>
+<li>Middleware that makes <tt class="docutils literal"><span class="pre">request.openid</span></tt> and <tt class="docutils literal"><span class="pre">request.openids</span></tt>
+properties available to your application views.</li>
+</ul>
+</div>
+<div class="section">
+<h2><a id="dependencies">Dependencies</a></h2>
+<p><tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt> uses the <a class="reference" href="http://www.openidenabled.com/openid/libraries/python/">python-openid library</a>, which must be
+installed separately somewhere on the Python path. You should install the 1.2.0
+&#8220;combo&#8221; package which includes the <tt class="docutils literal"><span class="pre">yadis</span></tt> and <tt class="docutils literal"><span class="pre">urljr</span></tt> libraries.</p>
+<p>The package also depends on the availability of Django&#8217;s <a class="reference" href="http://www.djangoproject.com/documentation/sessions/">session support</a>.</p>
+</div>
+<div class="section">
+<h2><a id="installation">Installation</a></h2>
+<p>Having ensured that both the  <tt class="docutils literal"><span class="pre">python-openid</span></tt> library and the <tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt> package are available on your Python path, you can
+add OpenID consumer support to an application by doing the following:</p>
+<ol class="arabic">
+<li><p class="first">Put <tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt> in your <tt class="docutils literal"><span class="pre">INSTALLED_APPS</span></tt> setting.</p>
+</li>
+<li><p class="first">Run the command <tt class="docutils literal"><span class="pre">manage.py</span> <span class="pre">syncdb</span></tt> to create the necessary tables.</p>
+</li>
+<li><p class="first">Add <tt class="docutils literal"><span class="pre">django_openidconsumer.middleware.OpenIDMiddleware</span></tt> to your list
+of <tt class="docutils literal"><span class="pre">MIDDLEWARE_CLASSES</span></tt>, somewhere after the Session middleware.</p>
+</li>
+<li><p class="first">Add the following views to your urlconf:</p>
+<pre class="literal-block">
+(r'^openid/$', 'django_openidconsumer.views.begin'),
+(r'^openid/complete/$', 'django_openidconsumer.views.complete'),
+(r'^openid/signout/$', 'django_openidconsumer.views.signout'),
+</pre>
+</li>
+</ol>
+<p>You will then be able to browse to <tt class="docutils literal"><span class="pre">example.com/openid/</span></tt> and sign in using
+an OpenID.</p>
+</div>
+<div class="section">
+<h2><a id="using-the-openid-middleware">Using the OpenID middleware</a></h2>
+<p>With the Middleware installed, your views will have access to the user&#8217;s OpenID
+as the <tt class="docutils literal"><span class="pre">request.openid</span></tt> property. This will be <tt class="docutils literal"><span class="pre">None</span></tt> if the user has not
+yet authenticated; otherwise it will be a <tt class="docutils literal"><span class="pre">django_openidconsumer.util.OpenID</span></tt>
+instance.</p>
+<p>If you want the user&#8217;s OpenID as a string, call the <tt class="docutils literal"><span class="pre">str()</span></tt> builtin on the
+OpenID instance:</p>
+<pre class="literal-block">
+def example_view(request):
+    if request.openid:
+        return HttpResponse(&quot;OpenID is %s&quot; % escape(str(request.openid)))
+    else:
+        return HttpResponse(&quot;No OpenID&quot;)
+</pre>
+<p>Users can sign in with more than one OpenID. This is supported by the
+<tt class="docutils literal"><span class="pre">request.openids</span></tt> property, which is a list of <tt class="docutils literal"><span class="pre">OpenID</span></tt> objects in the order
+in which they were authenticated. <tt class="docutils literal"><span class="pre">request.openid</span></tt> merely returns the last
+item in this list.</p>
+</div>
+<div class="section">
+<h2><a id="using-simple-registration">Using simple registration</a></h2>
+<p>Simple registration (or <a class="reference" href="http://openid.net/specs/openid-simple-registration-extension-1_0.html">sreg</a>) is an extension to the OpenID specification
+that  allows you to request extra details about a user from their OpenID
+provider. It is frequently used to pre-populate registration forms with
+information such as the user&#8217;s name, e-mail address or date of birth.</p>
+<p>Be aware that not all OpenID providers support sreg, and there is no guarantee
+that the information you have requested will be returned. Simple registration
+should be used as a convenience for your users rather than as a required step in
+your authentication process.</p>
+<p>Available simple registration fields are <tt class="docutils literal"><span class="pre">nickname</span></tt>, <tt class="docutils literal"><span class="pre">email</span></tt>, <tt class="docutils literal"><span class="pre">fullname</span></tt>,
+<tt class="docutils literal"><span class="pre">dob</span></tt>, <tt class="docutils literal"><span class="pre">gender</span></tt>, <tt class="docutils literal"><span class="pre">postcode</span></tt>, <tt class="docutils literal"><span class="pre">country</span></tt>, <tt class="docutils literal"><span class="pre">language</span></tt> and <tt class="docutils literal"><span class="pre">timezone</span></tt>.
+Full details are available in the <a class="reference" href="http://openid.net/specs/openid-simple-registration-extension-1_0.html">spec</a>.</p>
+<p>To request this information, pass the fields that you wish to retrieve as an
+additional <tt class="docutils literal"><span class="pre">sreg</span></tt> argument to the <tt class="docutils literal"><span class="pre">django_openidconsumer.views.begin</span></tt> view:</p>
+<pre class="literal-block">
+(r'^openid/$', 'django_openidconsumer.views.begin', {
+    'sreg': 'email,nickname'
+}),
+</pre>
+<p>Any simple registration fields that are returned will be available in a
+dictionary as the <tt class="docutils literal"><span class="pre">sreg</span></tt> property of the OpenID object:</p>
+<pre class="literal-block">
+def example_sreg(request):
+    if request.openid and request.openid.sreg.has_key('email'):
+        return HttpResponse(&quot;Your e-mail address is: %s&quot; % escape(
+            request.openid.sreg['email']
+        ))
+    else:
+        return HttpResponse(&quot;No e-mail address&quot;)
+</pre>
+</div>
+<div class="section">
+<h2><a id="customisation">Customisation</a></h2>
+<p><tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt> uses two templates:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">openid_signin.html</span></tt></dt>
+<dd>The form presented to the user when they sign in.</dd>
+<dt><tt class="docutils literal"><span class="pre">openid_failure.html</span></tt></dt>
+<dd>The template used to display an error message when something goes wrong.</dd>
+</dl>
+<p>You can over-ride the default templates by creating templates of the same name
+and placing them somewhere on your template path. You can find the example
+templates in the <tt class="docutils literal"><span class="pre">django_openidconsumer/templates</span></tt> directory.</p>
+<p>The OpenID specification strongly recommends that any OpenID registration form
+has a <tt class="docutils literal"><span class="pre">name</span></tt> attribute of <tt class="docutils literal"><span class="pre">openid_url</span></tt> to aid browser autocompletion, and
+displays the <a class="reference" href="http://openid.net/login-bg.gif">OpenID logo</a> inline in the form field using the following CSS:</p>
+<pre class="literal-block">
+input.openid {
+  background: url(/path/to/login-bg.gif) no-repeat;
+  background-position: 0 50%;
+  padding-left: 16px;
+}
+</pre>
+<p>By default, the package expects the <tt class="docutils literal"><span class="pre">django_openidconsumer.views.complete</span></tt>
+view to be located at <tt class="docutils literal"><span class="pre">/openid/complete/</span></tt>. This is the view that the OpenID
+provider will redirect the user to after they have authenticated. If you want to
+put it somewhere else you can either pass an extra <tt class="docutils literal"><span class="pre">redirect_to</span></tt> argument to
+<tt class="docutils literal"><span class="pre">django_openidconsumer.views.begin</span></tt> or add an <tt class="docutils literal"><span class="pre">OPENID_REDIRECT_TO</span></tt> setting
+to <tt class="docutils literal"><span class="pre">settings.py</span></tt>.</p>
+<p>You can pass a <tt class="docutils literal"><span class="pre">?next=</span></tt> query string argument containing a relative URL to
+the <tt class="docutils literal"><span class="pre">begin</span></tt> view to control where the user will be redirected to having
+returned to your site. You can also set the default redirection location
+using the <tt class="docutils literal"><span class="pre">OPENID_REDIRECT_NEXT</span></tt> setting; if you do set set a default the user
+will be redirected to your homepage.</p>
+</div>
+<div class="section">
+<h2><a id="i-names">i-names</a></h2>
+<p><a class="reference" href="http://www.inames.net/">i-names</a> are part of the OpenID 2.0 specification, which is currently being
+developed. They are supported by the python-openid library, and hence are also
+supported by <tt class="docutils literal"><span class="pre">django_openidconsumer</span></tt>. You can tell if an OpenID is an i-name
+by checking the <tt class="docutils literal"><span class="pre">request.openid.is_iname</span></tt> property.</p>
+<p>If you wish to disable i-name support, you can do so by adding the following to
+your <tt class="docutils literal"><span class="pre">settings.py</span></tt>:</p>
+<pre class="literal-block">
+OPENID_DISALLOW_INAMES = True
+</pre>
+</div>
