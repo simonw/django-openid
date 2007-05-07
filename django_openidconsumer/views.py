@@ -90,21 +90,25 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None):
     redirect_url = auth_request.redirectURL(trust_root, redirect_to)
     return HttpResponseRedirect(redirect_url)
 
-def complete(request):
+def complete(request, on_success=None, on_failure=None):
+    on_success = on_success or default_on_success
+    on_failure = on_failure or default_on_failure
+    
     consumer = Consumer(request.session, DjangoOpenIDStore())
     openid_response = consumer.complete(dict(request.GET.items()))
+    
     if openid_response.status == SUCCESS:
-        return success(request, openid_response.identity_url, openid_response)
+        return on_success(request, openid_response.identity_url, openid_response)
     elif openid_response.status == CANCEL:
-        return failure(request, 'The request was cancelled')
+        return on_failure(request, 'The request was cancelled')
     elif openid_response.status == FAILURE:
-        return failure(request, openid_response.message)
+        return on_failure(request, openid_response.message)
     elif openid_response.status == SETUP_NEEDED:
-        return failure(request, 'Setup needed')
+        return on_failure(request, 'Setup needed')
     else:
         assert False, "Bad openid status: %s" % openid_response.status
 
-def success(request, identity_url, openid_response):
+def default_on_success(request, identity_url, openid_response):
     if 'openids' not in request.session.keys():
         request.session['openids'] = []
     
@@ -120,7 +124,7 @@ def success(request, identity_url, openid_response):
     
     return HttpResponseRedirect(next)
 
-def failure(request, message):
+def default_on_failure(request, message):
     return render('openid_failure.html', {
         'message': message
     })
