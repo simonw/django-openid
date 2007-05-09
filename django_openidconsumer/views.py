@@ -38,7 +38,11 @@ def is_valid_next_url(next):
     # path, not a complete URL.
     return bool(next_url_re.match(next))
 
-def begin(request, sreg=None, extension_args=None, redirect_to=None):
+def begin(request, sreg=None, extension_args=None, redirect_to=None, 
+        on_failure=None):
+    
+    on_failure = on_failure or default_on_failure
+    
     if request.GET.get('logo'):
         # Makes for a better demo
         return HttpResponse(
@@ -74,13 +78,13 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None):
     if xri.identifierScheme(user_url) == 'XRI' and getattr(
         settings, 'OPENID_DISALLOW_INAMES', False
         ):
-        return failure(request, 'i-names are not supported')
+        return on_failure(request, 'i-names are not supported')
     
     consumer = Consumer(request.session, DjangoOpenIDStore())
     try:
         auth_request = consumer.begin(user_url)
     except DiscoveryFailure:
-        return failure(request, "The OpenID was invalid")
+        return on_failure(request, "The OpenID was invalid")
     
     # Add extension args (for things like simple registration)
     for name, value in extension_args.items():
