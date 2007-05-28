@@ -45,9 +45,7 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None,
     
     if request.GET.get('logo'):
         # Makes for a better demo
-        return HttpResponse(
-            OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
-        )
+        return logo(request)
     
     extension_args = extension_args or {}
     if sreg:
@@ -139,6 +137,11 @@ def signout(request):
     if not is_valid_next_url(next):
         next = '/'
     return HttpResponseRedirect(next)
+
+def logo(request):
+    return HttpResponse(
+        OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
+    )
 
 # Logo from http://openid.net/login-bg.gif
 # Embedded here for convenience; you should serve this as a static file
