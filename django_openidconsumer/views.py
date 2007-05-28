@@ -3,7 +3,7 @@ from django.shortcuts import render_to_response as render
 from django.template import RequestContext
 from django.conf import settings
 
-import md5, re, time
+import md5, re, time, urllib
 from openid.consumer.consumer import Consumer, \
     SUCCESS, CANCEL, FAILURE, SETUP_NEEDED
 from openid.consumer.discover import DiscoveryFailure
@@ -67,11 +67,22 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None,
             join = '&'
         else:
             join = '?'
-        redirect_to += join + 'next=' + urllib.urlencode(request.GET['next'])
+        redirect_to += join + urllib.urlencode({
+            'next': request.GET['next']
+        })
     
     user_url = request.POST.get('openid_url', None)
     if not user_url:
-        return render('openid_signin.html', {'action': request.path})
+        request_path = request.path
+        if request.GET.get('next'):
+            request_path += '?' + urllib.urlencode({
+                'next': request.GET['next']
+            })
+        
+        return render('openid_signin.html', {
+            'action': request_path,
+            'logo': request.path + '?logo=1',
+        })
     
     if xri.identifierScheme(user_url) == 'XRI' and getattr(
         settings, 'OPENID_DISALLOW_INAMES', False

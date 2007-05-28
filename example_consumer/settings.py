@@ -63,7 +63,7 @@ MIDDLEWARE_CLASSES = (
     'django_openidconsumer.middleware.OpenIDMiddleware',
 )
 
-ROOT_URLCONF = 'example.urls'
+ROOT_URLCONF = 'example_consumer.urls'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".

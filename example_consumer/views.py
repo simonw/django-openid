@@ -25,9 +25,14 @@ def index(request):
     s.append('<a href="/openid/">Sign in with OpenID</a>')
     s.append(' | <a href="/openid/with-sreg/">')
     s.append('Sign in with OpenID using simple registration</a>')
+    s.append(' | <a href="/openid/?next=/next-works/">')
+    s.append('Sign in with OpenID, testing ?next= param</a>')
     
     if request.openid:
         s.append(' | <a href="/openid/signout/">Sign out</a>')
     
     s.append('</p>')
     return HttpResponse('\n'.join(s))
+
+def next_works(request):
+    return HttpResponse('?next= bit works. <a href="/">Home</a>')

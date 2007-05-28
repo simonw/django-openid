@@ -10,4 +10,5 @@ urlpatterns = patterns('',
     }),
     (r'^openid/complete/$', 'django_openidconsumer.views.complete'),
     (r'^openid/signout/$', 'django_openidconsumer.views.signout'),
+    (r'^next-works/$', views.next_works),
 )
