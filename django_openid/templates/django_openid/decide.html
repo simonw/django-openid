@@ -1,0 +1,16 @@
+<h1>Sign in?</h1>
+
+<p>Sign in to <strong>{{ trust_root }}</strong> as <strong>{{ identity }}</strong>?</p>
+
+<form action="{{ action }}" method="POST">
+    <p>
+        {% if save_trusted_roots %}
+        <input type="submit" name="yes_once" value="Yes, just this once">
+        <input type="submit" name="yes_always" value="Yes, always">
+        {% else %}
+        <input type="submit" name="yes_once" value="Log in now">
+        {% endif %}
+        <input type="hidden" name="_decide" value="1">
+        <input type="hidden" name="orequest" value="{{ orequest }}">
+    </p>
+</form>

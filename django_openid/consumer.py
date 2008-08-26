@@ -19,7 +19,7 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.yadis import xri
 
 from django_openid.models import DjangoOpenIDStore
-from django_openid.utils import OpenID
+from django_openid.utils import OpenID, encode_object, decode_object
 
 class Endpoint(object):
     # Default templates
@@ -216,9 +216,6 @@ class SessionEndpoint(LoginEndpoint):
             request.openid = request.session['openids'][0]
             request.openids = request.session['openids']
 
-import pickle, zlib, base64, hashlib
-from django.conf import settings
-
 class CookieEndpoint(LoginEndpoint):
     """
     When the user logs in, save their OpenID details in a signed cookie. To 
@@ -234,32 +231,6 @@ class CookieEndpoint(LoginEndpoint):
     cookie_secure = None
     
     secret_key = None # If none, uses django.conf.settings.SECRET_KEY
-    
-    def get_secret(self):
-        if self.secret_key:
-            return self.secret_key
-        else:
-            return settings.SECRET_KEY
-    
-    def encode_object(self, obj):
-        "Returns URL-safe, sha1 signed base64 compressed pickle"
-        pickled = pickle.dumps(obj)
-        compressed = zlib.compress(pickled)
-        base64d = base64.urlsafe_b64encode(compressed)
-        sig = hashlib.sha1(base64d + self.get_secret()).hexdigest()
-        return base64d + ':' + sig
-    
-    def decode_object(self, s):
-        "Reverse of encode_object(), raises ValueError if signature fails"
-        if s.count(':') != 1:
-            raise ValueError, 'Should be one and only one colon'
-        base64d, sig1 = s.split(':')
-        sig2 = hashlib.sha1(base64d + self.get_secret()).hexdigest()
-        if sig1 != sig2:
-            raise ValueError, 'Signature failed: %s != %s' % (sig1, sig2)
-        compressed = base64.urlsafe_b64decode(base64d)
-        pickled = zlib.decompress(compressed)
-        return pickle.loads(pickled)
     
     def set_cookie(self, request, response, cookie_value):
         response.set_cookie(
@@ -280,7 +251,9 @@ class CookieEndpoint(LoginEndpoint):
     def on_success(self, request, identity_url, openid_response):
         openid = OpenID.from_openid_response(openid_response)
         response = self.on_logged_in(request, identity_url, openid_response)
-        self.set_cookie(request, response, self.encode_object(openid))
+        self.set_cookie(
+            request, response, encode_object(openid, self.secret_key)
+        )
         return response
     
     def do_logout(self, request):
@@ -292,7 +265,9 @@ class CookieEndpoint(LoginEndpoint):
         if not settings.DEBUG:
             raise Http404
         if self.cookie_key in request.COOKIES:
-            obj = self.decode_object(request.COOKIES[self.cookie_key])
+            obj = decode_object(
+                request.COOKIES[self.cookie_key], self.secret_key
+            )
             assert False, (obj, obj.__dict__)
         assert False, 'no cookie named %s' % self.cookie_key
     
@@ -301,10 +276,10 @@ class CookieEndpoint(LoginEndpoint):
         self._cookie_needs_deleting = False
         request.openid = None
         request.openids = []
-        cookie_value = request.COOKIES.get(self.cookie_key, None)
+        cookie_value = request.COOKIES.get(self.cookie_key, '')
         if cookie_value:
             try:
-                request.openid = self.decode_object(cookie_value)
+                request.openid = decode_object(cookie_value, self.secret_key)
                 request.openids = [request.openid]
             except ValueError: # Signature failed
                 self._cookie_needs_deleting = True
