@@ -1,6 +1,6 @@
 {% extends base_template %}
 
-{% block title %}Sign in with your OpenID{% endblock %}
+{% block title %}Log in with your OpenID{% endblock %}
 
 {% block extra_head %}
 <style type="text/css">
@@ -8,13 +8,14 @@ input.openid {
   background: url({{ logo }}) no-repeat; 
   background-position: 0 50%;
   padding-left: 16px;
+  width: 20em;
 }
 </style>
 
 {% endblock %}
 
 {% block content %}
-<h1>Sign in with your OpenID</h1>
+<h1>Log in with your OpenID</h1>
 
 <form action="{{ action }}" method="post">
 <p>
