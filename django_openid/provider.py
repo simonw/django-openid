@@ -12,6 +12,7 @@ class OpenIDServer(object):
     """
     The default OpenID server, designed to be subclassed.
     """
+    base_template = 'django_openid/base.html'
     this_is_a_server_template = 'django_openid/this_is_an_openid_server.html'
     landing_page_template = 'django_openid/landing_page.html'
     error_template = 'django_openid/error.html'
@@ -22,6 +23,11 @@ class OpenIDServer(object):
     
     save_trusted_roots = False # If true, tries to persist trusted roots
     secret_key = None
+    
+    def render(self, request, template, context=None):
+        context = context or {}
+        context['base_template'] = self.base_template
+        return render_to_response(template, context)
     
     def get_server(self, request):
         return Server(DjangoOpenIDStore())
@@ -50,12 +56,12 @@ class OpenIDServer(object):
         return response
     
     def show_landing_page(self, request, orequest):
-        return render_to_response(self.landing_page_template, {
+        return self.render(request, self.landing_page_template, {
             'identity_url': orequest.identity,
         })
     
     def show_error(self, request, message):
-        return render_to_response(self.error_template, {
+        return self.render(request, self.error_template, {
             'message': message,
         })
     
@@ -70,7 +76,7 @@ class OpenIDServer(object):
             return self.show_error(request, self.not_your_openid_message)
         
         # They are logged in - ask if they want to trust this root
-        return render_to_response(self.decide_template, {
+        return self.render(request, self.decide_template, {
             'trust_root': orequest.trust_root,
             'identity': orequest.identity,
             'orequest': encode_object(orequest, self.secret_key),
@@ -139,4 +145,4 @@ class OpenIDServer(object):
         return self.server_response(request, oresponse)
     
     def show_this_is_an_openid_server(self, request):
-        return render_to_response(self.this_is_a_server_template)
+        return self.render(request, self.this_is_a_server_template)

@@ -23,6 +23,7 @@ from django_openid.utils import OpenID, encode_object, decode_object
 
 class Endpoint(object):
     # Default templates
+    base_template = 'django_openid/base.html'
     login_template = 'django_openid/login.html'
     error_template = 'django_openid/error.html'
     
@@ -50,6 +51,11 @@ AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
 EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
 Fzk0lpcjIQA7""".strip()
     
+    def render(self, request, template, context=None):
+        context = context or {}
+        context['base_template'] = self.base_template
+        return render_to_response(template, context)
+    
     def __call__(self, request, rest_of_url):
         if not request.path.endswith('/'):
             return HttpResponseRedirect(request.path + '/')
@@ -63,14 +69,14 @@ Fzk0lpcjIQA7""".strip()
         return getattr(self, 'do_%s' % part)(request)
     
     def show_login(self, request, message=None):
-        return render_to_response(self.login_template, {
+        return self.render(request, self.login_template, {
             'action': request.path,
             'logo': self.logo_path or (request.path + 'logo/'),
             'message': message,
         })
     
     def show_error(self, request, message):
-        return render_to_response(self.error_template, {
+        return self.render(request, self.error_template, {
             'message': message,
         })
     
