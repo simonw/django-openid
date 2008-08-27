@@ -8,7 +8,7 @@ from openid.extensions import sreg
 from django_openid.models import DjangoOpenIDStore
 from django_openid.utils import encode_object, decode_object
 
-class OpenIDServer(object):
+class Provider(object):
     """
     The default OpenID server, designed to be subclassed.
     """

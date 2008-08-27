@@ -1,12 +1,12 @@
 """
-Endpoint is a class-based generic view which handles all aspects of consuming
+Consumer is a class-based generic view which handles all aspects of consuming
 and providing OpenID. User applications should define subclasses of this, 
 then hook those up directly to the urlconf.
 
-from myapp import MyEndpointSubclass
+from myapp import MyConsumerSubclass
 
 urlpatterns = patterns('',
-    ('r^openid/(.*)', MyEndpointSubclass()),
+    ('r^openid/(.*)', MyConsumerSubclass()),
     ...
 )
 """
@@ -21,7 +21,7 @@ from openid.yadis import xri
 from django_openid.models import DjangoOpenIDStore
 from django_openid.utils import OpenID, encode_object, decode_object
 
-class Endpoint(object):
+class Consumer(object):
     # Default templates
     base_template = 'django_openid/base.html'
     login_template = 'django_openid/login.html'
@@ -164,12 +164,12 @@ Fzk0lpcjIQA7""".strip()
             self.OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
         )
 
-class LoginEndpoint(Endpoint):
+class LoginConsumer(Consumer):
     redirect_after_login = '/'
     redirect_after_logout = '/'
     
     def on_success(self, *args):
-        assert False, 'LoginEndpoint must be subclassed before use'
+        assert False, 'LoginConsumer must be subclassed before use'
     
     def on_logged_in(self, request, identity_url, openid_response):
         # TODO: Handle ?next= parameter
@@ -179,7 +179,7 @@ class LoginEndpoint(Endpoint):
         # TODO: Handle ?next= parameter
         return HttpResponseRedirect(self.redirect_after_logout)
     
-class SessionEndpoint(LoginEndpoint):
+class SessionConsumer(LoginConsumer):
     """
     When the user logs in, save their OpenID in the session. This can handle 
     multiple OpenIDs being signed in at the same time.
@@ -222,12 +222,12 @@ class SessionEndpoint(LoginEndpoint):
             request.openid = request.session['openids'][0]
             request.openids = request.session['openids']
 
-class CookieEndpoint(LoginEndpoint):
+class CookieConsumer(LoginConsumer):
     """
     When the user logs in, save their OpenID details in a signed cookie. To 
     avoid cookies getting too big, this endpoint only stores the most 
     recently signed in OpenID; if you want multiple OpenIDs signed in at once
-    you should use the SessionEndpoint instead.
+    you should use the SessionConsumer instead.
     """
     cookie_key = 'openid'
     cookie_max_age = None
@@ -291,6 +291,6 @@ class CookieEndpoint(LoginEndpoint):
                 self._cookie_needs_deleting = True
     
     def process_response(self, request, response):
-        if self._cookie_needs_deleting:
+        if getattr(self, '_cookie_needs_deleting', False):
             self.delete_cookie(response)
         return response
