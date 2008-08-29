@@ -38,6 +38,10 @@ class Consumer(object):
     # Default messages
     openid_required_message = 'Enter an OpenID'
     xri_disabled_message = 'i-names are not supported'
+    openid_invalid_message = 'The OpenID was invalid'
+    request_cancelled_message = 'The request was cancelled'
+    failure_message = 'Failure: %s'
+    setup_needed_message = 'Setup needed'
     
     xri_enabled = False
     on_complete_url = None
@@ -69,6 +73,7 @@ Fzk0lpcjIQA7""".strip()
         return getattr(self, 'do_%s' % part)(request)
     
     def show_login(self, request, message=None):
+        done = request.REQUEST.get('done', '')
         return self.render(request, self.login_template, {
             'action': request.path,
             'logo': self.logo_path or (request.path + 'logo/'),
@@ -111,7 +116,7 @@ Fzk0lpcjIQA7""".strip()
         try:
             auth_request = self.get_consumer(request).begin(user_url)
         except DiscoveryFailure:
-            return self.show_error(request, "The OpenID was invalid")
+            return self.show_error(request, self.openid_invalid_message)
         
         trust_root = self.trust_root or request.build_absolute_uri()
         on_complete_url = self.on_complete_url or \
@@ -144,20 +149,19 @@ Fzk0lpcjIQA7""".strip()
         assert False, 'debug!'
     
     def on_success(self, request, identity_url, openid_response):
-        return HttpResponse("You logged in as %s" % (
-            openid_response.identity_url
-        ))
+        # This is the one method you REALLY want to over-ride
+        return HttpResponse("You logged in as %s" % identity_url)
     
     def on_cancel(self, request, openid_response):
-        return self.show_error(request, 'The request was cancelled')
+        return self.show_error(request, self.request_cancelled_message)
     
     def on_failure(self, request, openid_response):
-        return self.show_error(request, 
-            'Failure: %s' % openid_response.message
+        return self.show_error(
+            request, self.failure_message % openid_response.message
         )
     
     def on_setup_needed(self, request, openid_response):
-        return self.show_error(request, 'Setup needed')
+        return self.show_error(request, self.setup_needed_message)
     
     def do_logo(self, request):
         return HttpResponse(
@@ -219,8 +223,11 @@ class SessionConsumer(LoginConsumer):
         request.openid = None
         request.openids = []
         if self.session_key in request.session:
-            request.openid = request.session['openids'][0]
-            request.openids = request.session['openids']
+            try:
+                request.openid = request.session[self.session_key][0]
+            except IndexError:
+                request.openid = None
+            request.openids = request.session[self.session_key]
 
 class CookieConsumer(LoginConsumer):
     """
