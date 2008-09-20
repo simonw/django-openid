@@ -19,7 +19,52 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.yadis import xri
 
 from django_openid.models import DjangoOpenIDStore
-from django_openid.utils import OpenID, encode_object, decode_object
+from django_openid.utils import OpenID
+from django_openid import signed
+
+class SessionUserSessionMixin(object):
+    def get_user_session(self, request):
+        return request.session
+    def set_user_session(self, request, response, user_session):
+        pass
+
+class CookieUserSessionMixin(object):
+    """
+    Use this mixin if you are avoiding Django's session support entirely.
+    """
+    cookie_user_session_key = 'o_user_session'
+    cookie_user_session_path = '/'
+    cookie_user_session_domain = None
+    cookie_user_session_secure = None
+    
+    def get_user_session(self, request):
+        print "CookieUserSessionMixin: get_user_session"
+        # By default Consumer uses Django sessions; here we over-ride so it 
+        # works using signed cookies instead.
+        try:
+            user_session = signed.loads(
+                request.COOKIES.get(self.cookie_user_session_key, '')
+            )
+        except ValueError:
+            user_session = {}
+        return user_session
+    
+    def set_user_session(self, request, response, user_session):
+        print "CookieUserSessionMixin: set_user_session"
+        if user_session:
+            response.set_cookie(
+                key = self.cookie_user_session_key,
+                value = signed.dumps(user_session, compress = True),
+                path = self.cookie_user_session_path,
+                domain = self.cookie_user_session_domain,
+                secure = self.cookie_user_session_secure,
+            )
+        else:
+            response.delete_cookie(
+                key = self.cookie_user_session_key,
+                path = self.cookie_user_session_path,
+                domain = self.cookie_user_session_domain,
+            )
 
 class Consumer(object):
     # Default templates
@@ -29,6 +74,10 @@ class Consumer(object):
     
     # Extension args; most of the time you'll just need the sreg shortcuts
     extension_args = {}
+    extension_namespaces = {
+        'sreg': 'http://openid.net/sreg/1.0',
+    }
+    
     # Simple registration. Possible fields are:
     # nickname,email,fullname,dob,gender,postcode,country,language,timezone
     sreg = sreg_optional = [] # sreg is alias for sreg_optional
@@ -73,11 +122,15 @@ Fzk0lpcjIQA7""".strip()
         return getattr(self, 'do_%s' % part)(request)
     
     def show_login(self, request, message=None):
-        done = request.REQUEST.get('done', '')
+        try:
+            done = signed.loads(request.REQUEST.get('done', ''))
+        except ValueError:
+            done = ''
         return self.render(request, self.login_template, {
             'action': request.path,
             'logo': self.logo_path or (request.path + 'logo/'),
             'message': message,
+            'done': done,
         })
     
     def show_error(self, request, message):
@@ -85,8 +138,8 @@ Fzk0lpcjIQA7""".strip()
             'message': message,
         })
     
-    def get_consumer(self, request):
-        return consumer.Consumer(request.session, DjangoOpenIDStore())
+    def get_consumer(self, request, session_store):
+        return consumer.Consumer(session_store, DjangoOpenIDStore())
     
     def add_extension_args(self, request, auth_request):
         # Add extension args (for things like simple registration)
@@ -100,6 +153,7 @@ Fzk0lpcjIQA7""".strip()
         
         for name, value in extension_args.items():
             namespace, key = name.split('.', 1)
+            namespace = self.extension_namespaces.get(namespace, namespace)
             auth_request.addExtensionArg(namespace, key, value)
     
     def do_login(self, request):
@@ -113,8 +167,12 @@ Fzk0lpcjIQA7""".strip()
         if xri.identifierScheme(user_url) == 'XRI' and not self.xri_enabled:
             return self.show_login(request, self.xri_disabled_message)
         
+        user_session = self.get_user_session(request)
+        
         try:
-            auth_request = self.get_consumer(request).begin(user_url)
+            auth_request = self.get_consumer(
+                request, user_session
+            ).begin(user_url)
         except DiscoveryFailure:
             return self.show_error(request, self.openid_invalid_message)
         
@@ -125,23 +183,41 @@ Fzk0lpcjIQA7""".strip()
         self.add_extension_args(request, auth_request)
         
         redirect_url = auth_request.redirectURL(trust_root, on_complete_url)
-        return HttpResponseRedirect(redirect_url)
+        response = HttpResponseRedirect(redirect_url)
+        self.set_user_session(request, response, user_session)
+        return response
+    
+    def get_user_session(self, request):
+        print "Consumer: get_user_session"
+        return request.session
+    
+    def set_user_session(self, request, response, user_session):
+        print "Consumer: set_user_session"
+        pass
     
     def do_complete(self, request):
-        openid_response = self.get_consumer(request).complete(
+        user_session = self.get_user_session(request)
+        
+        openid_response = self.get_consumer(
+            request, user_session
+        ).complete(
             dict(request.GET.items()),
             request.build_absolute_uri().split('?')[0] # to verify return_to
         )
         if openid_response.status == consumer.SUCCESS:
-            return self.on_success(
+            response = self.on_success(
                 request, openid_response.identity_url, openid_response
             )
         else:
-            return {
+            response = {
                 consumer.CANCEL: self.on_cancel,
                 consumer.FAILURE: self.on_failure,
                 consumer.SETUP_NEEDED: self.on_setup_needed,
             }[openid_response.status](request, openid_response)
+        
+        self.set_user_session(request, response, user_session)
+        
+        return response
     
     def do_debug(self, request):
         if not settings.DEBUG:
@@ -205,7 +281,7 @@ class SessionConsumer(LoginConsumer):
         return self.on_logged_in(request, identity_url, openid_response)
     
     def do_logout(self, request):
-        openid = request.GET.get(self.session_key, None)
+        openid = request.GET.get('openid', '').strip()
         if openid:
             # Just sign out that one
             request.session[self.session_key] = [
@@ -229,7 +305,7 @@ class SessionConsumer(LoginConsumer):
                 request.openid = None
             request.openids = request.session[self.session_key]
 
-class CookieConsumer(LoginConsumer):
+class CookieConsumer(CookieUserSessionMixin, LoginConsumer):
     """
     When the user logs in, save their OpenID details in a signed cookie. To 
     avoid cookies getting too big, this endpoint only stores the most 
@@ -265,7 +341,9 @@ class CookieConsumer(LoginConsumer):
         openid = OpenID.from_openid_response(openid_response)
         response = self.on_logged_in(request, identity_url, openid_response)
         self.set_cookie(
-            request, response, encode_object(openid, self.secret_key)
+            request, response, signed.dumps(
+                openid, self.secret_key, compress = True
+            )
         )
         return response
     
@@ -278,7 +356,7 @@ class CookieConsumer(LoginConsumer):
         if not settings.DEBUG:
             raise Http404
         if self.cookie_key in request.COOKIES:
-            obj = decode_object(
+            obj = signed.loads(
                 request.COOKIES[self.cookie_key], self.secret_key
             )
             assert False, (obj, obj.__dict__)
@@ -292,7 +370,7 @@ class CookieConsumer(LoginConsumer):
         cookie_value = request.COOKIES.get(self.cookie_key, '')
         if cookie_value:
             try:
-                request.openid = decode_object(cookie_value, self.secret_key)
+                request.openid = signed.loads(cookie_value, self.secret_key)
                 request.openids = [request.openid]
             except ValueError: # Signature failed
                 self._cookie_needs_deleting = True

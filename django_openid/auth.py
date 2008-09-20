@@ -44,7 +44,7 @@ class AuthConsumer(consumer.SessionConsumer):
                 return self.already_logged_in(request, openid)
             else:
                 # Offer to associate this OpenID with their account
-                return self.do_associate(request, openid)
+                return self.show_associate(request, openid)
         if matches:
             # If there's only one match, log you in as that user
             if len(matches) == 1:
@@ -56,7 +56,7 @@ class AuthConsumer(consumer.SessionConsumer):
             # Brand new OpenID; show them the registration screen
             return self.show_registration(request, openid)
     
-    def do_associate(self, request, openid=None):
+    def show_associate(self, request, openid=None):
         "Screen that offers to associate an OpenID with a user's account"
         if not request.user.is_authenticated():
             return self.need_authenticated_user(request)

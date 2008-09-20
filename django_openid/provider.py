@@ -6,7 +6,7 @@ from openid.server.server import Server
 from openid.extensions import sreg
 
 from django_openid.models import DjangoOpenIDStore
-from django_openid.utils import encode_object, decode_object
+from django_openid import signed
 
 class Provider(object):
     """
@@ -79,7 +79,7 @@ class Provider(object):
         return self.render(request, self.decide_template, {
             'trust_root': orequest.trust_root,
             'identity': orequest.identity,
-            'orequest': encode_object(orequest, self.secret_key),
+            'orequest': signed.dumps(orequest, self.secret_key),
             'action': request.path,
             'save_trusted_roots': self.save_trusted_roots
         })
@@ -99,7 +99,7 @@ class Provider(object):
     
     def process_decide(self, request):
         try:
-            orequest = decode_object(
+            orequest = signed.loads(
                 request.POST.get('orequest', ''), self.secret_key
             )
         except ValueError:
