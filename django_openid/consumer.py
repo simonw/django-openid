@@ -38,7 +38,6 @@ class CookieUserSessionMixin(object):
     cookie_user_session_secure = None
     
     def get_user_session(self, request):
-        print "CookieUserSessionMixin: get_user_session"
         # By default Consumer uses Django sessions; here we over-ride so it 
         # works using signed cookies instead.
         try:
@@ -50,7 +49,6 @@ class CookieUserSessionMixin(object):
         return user_session
     
     def set_user_session(self, request, response, user_session):
-        print "CookieUserSessionMixin: set_user_session"
         if user_session:
             response.set_cookie(
                 key = self.cookie_user_session_key,
@@ -195,11 +193,9 @@ Fzk0lpcjIQA7""".strip()
         return response
     
     def get_user_session(self, request):
-        print "Consumer: get_user_session"
         return request.session
     
     def set_user_session(self, request, response, user_session):
-        print "Consumer: set_user_session"
         pass
     
     def do_complete(self, request):
