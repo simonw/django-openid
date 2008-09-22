@@ -1,5 +1,21 @@
 from django.http import HttpResponseRedirect as Redirect
-import consumer
+from django_openid import consumer, signed
+from django.conf import settings
+
+import urlparse
+
+def display_login_form_openid(bind_to_me, openid_path):
+    # Monkey-patch for the admin
+    "openid_path is the path the OpenID login should submit to, e.g. /openid/"
+    from django.contrib.admin.sites import AdminSite
+    def display_login_form(request, error_message='', 
+            extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['openid_path'] = openid_path
+        return AdminSite.display_login_form(
+            bind_to_me, request, error_message, extra_context
+        )
+    return display_login_form
 
 class AuthConsumer(consumer.SessionConsumer):
     """
@@ -11,10 +27,11 @@ class AuthConsumer(consumer.SessionConsumer):
     
     need_authenticated_user_message = 'You need to sign in with an ' \
         'existing user account to access this page.'
+    csrf_failed_message = 'Invalid submission'
     
     def lookup_openid(self, request, identity_url):
-        # Imports live inside this method so they won't get imported if you 
-        # over-ride this in your own sub-class 
+        # Imports lives inside this method so USer won't get imported if you 
+        # over-ride this in your own sub-class and use something else.
         from django.contrib.auth.models import User
         return list(
             User.objects.filter(openids__openid = identity_url).distinct()
@@ -48,7 +65,7 @@ class AuthConsumer(consumer.SessionConsumer):
         if matches:
             # If there's only one match, log you in as that user
             if len(matches) == 1:
-                self.log_in_user(request, matches[0], openid)
+                return self.log_in_user(request, matches[0], openid)
             # Otherwise, let them to pick which account they want to log in as
             else:
                 return self.show_pick_account(request, openid)
@@ -65,12 +82,43 @@ class AuthConsumer(consumer.SessionConsumer):
             assert False, 'Not yet implemented'
         else:
             return self.render(request, 'django_openid/associate.html', {
+                'action': urlparse.urljoin(request.path, '../associate/'),
                 'user': request.user,
                 'specific_openid': openid,
+                'openid_token': signed.dumps(
+                   # Use user.id as part of secret to prevent attackers from
+                   # creating their own openid_token for use in CSRF attack
+                   openid, secret = settings.SECRET_KEY + str(request.user.id)
+                ),
                 'openids': request.openids,
             })
     
+    def do_associate(self, request):
+        if request.method == 'POST':
+            try:
+                openid = signed.loads(
+                    request.POST.get('openid_token', ''),
+                    secret = settings.SECRET_KEY + str(request.user.id)
+                )
+            except ValueError:
+                return self.show_error(request, self.csrf_failed_message)
+            # Associate openid with their account, if it isn't already
+            if not request.user.openids.filter(openid = openid):
+                request.user.openids.create(openid = openid)
+            return self.show_associate_done(self, openid)
+            
+        return self.show_error(request, 'Should POST to here')
+    
+    def show_associate_done(self, request, openid):
+        return self.show_message(request, 'Associated', 
+            'Your OpenID is now associated with your account.'
+        )
+    
     def need_authenticated_user(self, request):
         return self.show_error(self.need_authenticated_user_message)
-
+    
+    def do_associations(self, request):
+        "Interface for managing your account's associated OpenIDs"
+        assert False, 'not done yet'
+    
             

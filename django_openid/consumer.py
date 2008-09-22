@@ -71,6 +71,7 @@ class Consumer(object):
     base_template = 'django_openid/base.html'
     login_template = 'django_openid/login.html'
     error_template = 'django_openid/error.html'
+    message_template = 'django_openid/message.html'
     
     # Extension args; most of the time you'll just need the sreg shortcuts
     extension_args = {}
@@ -109,7 +110,7 @@ Fzk0lpcjIQA7""".strip()
         context['base_template'] = self.base_template
         return render_to_response(template, context)
     
-    def __call__(self, request, rest_of_url):
+    def __call__(self, request, rest_of_url=''):
         if not request.path.endswith('/'):
             return HttpResponseRedirect(request.path + '/')
         
@@ -135,6 +136,12 @@ Fzk0lpcjIQA7""".strip()
     
     def show_error(self, request, message):
         return self.render(request, self.error_template, {
+            'message': message,
+        })
+    
+    def show_message(self, request, title, message):
+        return self.render(request, self.message_template, {
+            'title': title,
             'message': message,
         })
     
