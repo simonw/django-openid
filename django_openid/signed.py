@@ -1,7 +1,40 @@
 """
-Functions for creating and restoring url-safe signed pickles.
+Functions for creating and restoring url-safe signed pickled objects.
+
+The format used looks like this:
+
+>>> signed.dumps("hello")
+'UydoZWxsbycKcDAKLg.AfZVu7tE6T1K1AecbLiLOGSqZ-A'
+
+There are two components here, separatad by a '.'. The first component is a 
+URLsafe base64 encoded pickle of the object passed to dumps(). The second 
+component is a base64 encoded SHA1 hash of "$first_component.$secret"
+
+Calling signed.loads(s) checks the signature BEFORE unpickling the object - 
+this protects against malformed pickle attacks. If the signature fails, a 
+ValueError subclass is raised (actually a BadSignature):
+
+>>> signed.loads('UydoZWxsbycKcDAKLg.AfZVu7tE6T1K1AecbLiLOGSqZ-A')
+'hello'
+>>> signed.loads('UydoZWxsbycKcDAKLg.AfZVu7tE6T1K1AecbLiLOGSqZ-A-modified')
+...
+BadSignature: Signature failed: AfZVu7tE6T1K1AecbLiLOGSqZ-A-modified
+
+You can optionally compress the pickle prior to base64 encoding it to save 
+space, using the compress=True argument. This checks if compression actually
+helps and only applies compression if the result is a shorter string:
+
+>>> signed.dumps(range(1, 10), compress=True)
+'.eJzTyCkw4PI05Er0NAJiYyA2AWJTIDYDYnMgtgBiS65EPQDQyQme.EQpzZCCMd3mIa4RXDGnAuMCCAx0'
+
+The fact that the string is compressed is signalled by the prefixed '.' at the
+start of the base64 pickle.
+
+There are 65 url-safe characters: the 64 used by url-safe base64 and the '.'. 
+These functions make use of all of them.
 """
-import pickle, base64, hashlib, zlib
+
+import pickle, base64, hashlib
 from django.conf import settings
 
 def dumps(obj, secret = None, compress = False):
@@ -16,6 +49,7 @@ def dumps(obj, secret = None, compress = False):
     pickled = pickle.dumps(obj)
     is_compressed = False # Flag for if it's been compressed or not
     if compress:
+        import zlib # Avoid zlib dependency unless compress is being used
         compressed = zlib.compress(pickled)
         if len(compressed) < (len(pickled) - 1):
             pickled = compressed
@@ -27,7 +61,8 @@ def dumps(obj, secret = None, compress = False):
 
 def loads(s, secret = None):
     "Reverse of dumps(), raises ValueError if signature fails"
-    s = s.encode('utf8') # base64 works on bytestrings, not on unicodes
+    if isinstance(s, unicode):
+        s = s.encode('utf8') # base64 works on bytestrings, not on unicodes
     try:
         base64d = unsign(s, secret)
     except ValueError:
@@ -39,11 +74,13 @@ def loads(s, secret = None):
         decompress = True
     pickled = base64.urlsafe_b64decode(base64d + '=' * (len(base64d) % 4))
     if decompress:
+        import zlib
         pickled = zlib.decompress(pickled)
     return pickle.loads(pickled)
 
 class BadSignature(ValueError):
-    # Extends ValueError, which makes it more convenient to catch
+    # Extends ValueError, which makes it more convenient to catch and has 
+    # basically the correct semantics.
     pass
 
 def sign(value, key = None):
