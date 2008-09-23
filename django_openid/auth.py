@@ -30,7 +30,7 @@ class AuthConsumer(consumer.SessionConsumer):
     csrf_failed_message = 'Invalid submission'
     
     def lookup_openid(self, request, identity_url):
-        # Imports lives inside this method so USer won't get imported if you 
+        # Imports lives inside this method so User won't get imported if you 
         # over-ride this in your own sub-class and use something else.
         from django.contrib.auth.models import User
         return list(
