@@ -1,0 +1,31 @@
+{% extends base_template %}
+
+{% block title %}Manage your associated OpenIDs{% endblock %}
+
+{% block content %}
+<h1>Manage your associated OpenIDs</h1>
+
+<p>You have {{ openids|length }} OpenID{{ openids|length|pluralize}} associated with your account.</p>
+
+{% if message %}<p><strong>{{ message }}</strong></p>{% endif %}
+
+{% for openid in openids %}
+<form action="{{ action }}" method="POST">
+    <p>{{ openid.openid }}
+        <input type="hidden" name="todelete" value="{{ openid.button }}">
+        <input id="delete-{{ forloop.counter }}" type="submit" value="Delete this association">
+    </p>
+</form>
+{% endfor %}
+
+<p><strong>Associate a new OpenID:</strong></p>
+
+<form action="{{ action_new }}" method="post">
+<p>
+    <input class="openid" type="text" name="openid_url">
+    <input type="hidden" name="next" value="{{ associate_next }}">
+    <input type="submit" value="Associate">
+</p>
+</form>
+
+{% endblock %}
