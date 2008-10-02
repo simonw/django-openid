@@ -19,7 +19,8 @@ input.openid {
 <form action="{{ action }}" method="post">
 <p>
     <input class="openid" type="text" name="openid_url">
-    <input type="submit" value="Sign in">
+{% if next %}    <input type="hidden" name="next" value="{{ next }}">
+{% endif %}    <input type="submit" value="Sign in">
 </p>
 </form>
 {% endblock %}

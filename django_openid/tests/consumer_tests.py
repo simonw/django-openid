@@ -53,6 +53,21 @@ class ConsumerTest(TestCase):
             response.content, 'You logged in as http://simonwillison.net/'
         )
     
+    def testLoginNext(self):
+        "?next=<signed> causes final redirect to go there instead"
+        openid_consumer = MyConsumer()
+        openid_consumer.set_mock_response(
+            status = janrain_consumer.SUCCESS,
+            identity_url = 'http://simonwillison.net/',
+        )
+        get = rf.get('/openid/complete/', {
+            'openid-args': 'go-here',
+            'next': openid_consumer.sign_done('/foo/')
+        })
+        get.session = MockSession()
+        response = openid_consumer(get, 'complete/')
+        self.assertEqual(response['Location'], '/foo/')
+    
     def testLoginCancel(self):
         openid_consumer = MyConsumer()
         openid_consumer.set_mock_response(

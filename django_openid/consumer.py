@@ -91,6 +91,7 @@ class Consumer(object):
     failure_message = 'Failure: %s'
     setup_needed_message = 'Setup needed'
     
+    salt_next = 'salt-next-token' # Adds extra saltiness to the ?next= salt
     xri_enabled = False
     on_complete_url = None
     trust_root = None # If None, full URL to endpoint is used
@@ -103,6 +104,9 @@ AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
 EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
 Fzk0lpcjIQA7""".strip()
     
+    def sign_done(self, url):
+        return signed.dumps(url, extra_salt = self.salt_next)
+    
     def render(self, request, template, context=None):
         context = context or {}
         context['base_template'] = self.base_template
@@ -114,22 +118,28 @@ Fzk0lpcjIQA7""".strip()
         
         # Dispatch based on path component
         part = rest_of_url.split('/')[0]
+        
         if not part:
-            return self.do_login(request)
+            return self.do_index(request)
         if not hasattr(self, 'do_%s' % part):
             raise Http404, 'No do_%s method' % part
         return getattr(self, 'do_%s' % part)(request)
     
+    def do_index(self, request):
+        return self.do_login(request)
+    
     def show_login(self, request, message=None):
         try:
-            done = signed.loads(request.REQUEST.get('done', ''))
+            next = signed.loads(
+                request.REQUEST.get('next', ''), extra_salt=self.salt_next
+            )
         except ValueError:
-            done = ''
+            next = ''
         return self.render(request, self.login_template, {
             'action': request.path,
             'logo': self.logo_path or (request.path + 'logo/'),
             'message': message,
-            'done': done,
+            'next': next and request.REQUEST.get('next', '') or None,
         })
     
     def show_error(self, request, message):
@@ -182,8 +192,23 @@ Fzk0lpcjIQA7""".strip()
             return self.show_error(request, self.openid_invalid_message)
         
         trust_root = self.trust_root or request.build_absolute_uri()
-        on_complete_url = self.on_complete_url or \
-            request.build_absolute_uri() + 'complete/'
+        
+        try:
+            next = signed.loads(
+                request.POST.get('next', ''), extra_salt=self.salt_next
+            )
+        except ValueError:
+            next = None
+        
+        # Signed ?next= from the URL takes precedent
+        if next:
+            on_complete_url = (
+                request.build_absolute_uri() + 'complete/?next=' + 
+                request.POST['next']
+            )
+        else:
+            on_complete_url = self.on_complete_url or \
+                request.build_absolute_uri() + 'complete/'
         
         self.add_extension_args(request, auth_request)
         
@@ -227,9 +252,23 @@ Fzk0lpcjIQA7""".strip()
             raise Http404
         assert False, 'debug!'
     
+    def redirect_if_valid_next(self, request):
+        "Logic for checking if a signed ?next= token is included in request"
+        try:
+            next = signed.loads(
+                request.REQUEST.get('next', ''), extra_salt=self.salt_next
+            )
+            return HttpResponseRedirect(next)
+        except ValueError:
+            return None
+    
     def on_success(self, request, identity_url, openid_response):
-        # This is the one method you REALLY want to over-ride
-        return HttpResponse("You logged in as %s" % identity_url)
+        response = self.redirect_if_valid_next(request)
+        if not response:
+            response = HttpResponse(
+                "You logged in as %s" % identity_url
+            )
+        return response
     
     def on_cancel(self, request, openid_response):
         return self.show_error(request, self.request_cancelled_message)
@@ -255,12 +294,16 @@ class LoginConsumer(Consumer):
         assert False, 'LoginConsumer must be subclassed before use'
     
     def on_logged_in(self, request, identity_url, openid_response):
-        # TODO: Handle ?next= parameter
-        return HttpResponseRedirect(self.redirect_after_login)
+        response = self.redirect_if_valid_next(request)
+        if not response:
+            response = HttpResponseRedirect(self.redirect_after_login)
+        return response
     
     def on_logged_out(self, request):
-        # TODO: Handle ?next= parameter
-        return HttpResponseRedirect(self.redirect_after_logout)
+        response = self.redirect_if_valid_next(request)
+        if not response:
+            response = HttpResponseRedirect(self.redirect_after_logout)
+        return response
     
 class SessionConsumer(LoginConsumer):
     """
