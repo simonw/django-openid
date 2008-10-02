@@ -113,11 +113,14 @@ class DjangoOpenIDStore(OpenIDStore):
     def isDumb(self):
         return False
 
-# Model for auth integration - lets you associate 1+ OpenIDs with a User
-class UserOpenidAssociation(models.Model):
-    user = models.ForeignKey('auth.User', related_name = 'openids')
-    openid = models.CharField(max_length = 255)
-    created = models.DateTimeField(auto_now_add = True)
-    
-    def __unicode__(self):
-        return u'%s can log in with %s' % (self.user, self.openid)
+# Only include table for User->OpenID associations if User model is installed
+user_model = models.get_model('auth', 'User')
+if user_model and user_model._meta.installed:
+    class UserOpenidAssociation(models.Model):
+        "Auth integration - lets you associate 1+ OpenIDs with a User"
+        user = models.ForeignKey('auth.User', related_name = 'openids')
+        openid = models.CharField(max_length = 255)
+        created = models.DateTimeField(auto_now_add = True)
+        
+        def __unicode__(self):
+            return u'%s can log in with %s' % (self.user, self.openid)
