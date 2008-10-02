@@ -37,7 +37,7 @@ These functions make use of all of them.
 import pickle, base64, hashlib
 from django.conf import settings
 
-def dumps(obj, secret = None, compress = False):
+def dumps(obj, secret = None, compress = False, extra_salt = ''):
     """
     Returns URL-safe, sha1 signed base64 compressed pickle. If secret is 
     None, settings.SECRET_KEY is used instead.
@@ -57,14 +57,14 @@ def dumps(obj, secret = None, compress = False):
     base64d = base64.urlsafe_b64encode(pickled).strip('=')
     if is_compressed:
         base64d = '.' + base64d
-    return sign(base64d, secret)
+    return sign(base64d, (secret or settings.SECRET_KEY) + extra_salt)
 
-def loads(s, secret = None):
+def loads(s, secret = None, extra_salt = ''):
     "Reverse of dumps(), raises ValueError if signature fails"
     if isinstance(s, unicode):
         s = s.encode('utf8') # base64 works on bytestrings, not on unicodes
     try:
-        base64d = unsign(s, secret)
+        base64d = unsign(s, (secret or settings.SECRET_KEY) + extra_salt)
     except ValueError:
         raise
     decompress = False
