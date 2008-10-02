@@ -24,6 +24,9 @@ class Provider(object):
     save_trusted_roots = False # If true, tries to persist trusted roots
     secret_key = None
     
+    incomplete_orequest_cookie_key = 'incomplete_orequest'
+    orequest_salt = 'orequest-salt'
+    
     def render(self, request, template, context=None):
         context = context or {}
         context['base_template'] = self.base_template
@@ -56,9 +59,16 @@ class Provider(object):
         return response
     
     def show_landing_page(self, request, orequest):
-        return self.render(request, self.landing_page_template, {
+        # Stash the incomplete orequest in a signed cookie
+        response = self.render(request, self.landing_page_template, {
             'identity_url': orequest.identity,
         })
+        response.set_cookie(
+            self.incomplete_orequest_cookie_key, signed.dumps(
+                orequest, extra_salt = self.orequest_salt
+            )
+        )
+        return response
     
     def show_error(self, request, message):
         return self.render(request, self.error_template, {
@@ -119,6 +129,15 @@ class Provider(object):
         self.add_sreg_data(request, orequest, oresponse)
         return self.server_response(request, oresponse)
     
+    def extract_incomplete_orequest(self, request):
+        # Incomplete orequests are stashed in a cookie
+        try:
+            return signed.loads(request.COOKIES.get(
+                self.incomplete_orequest_cookie_key, ''
+            ), extra_salt = self.orequest_salt)
+        except signed.BadSignature:
+            return None
+    
     def __call__(self, request):
         # If this is a POST from the decide page, behave differently
         if '_decide' in request.POST:
@@ -127,6 +146,15 @@ class Provider(object):
         querydict = dict(request.REQUEST.items())
         orequest = self.get_server(request).decodeRequest(querydict)
         if not orequest:
+            # This case (accessing the /server/ page without any args) serves 
+            # two purposes. If the user has a partially complete OpenID 
+            # request stashed in a signed cookie (i.e. they weren't logged 
+            # in when they hit the anti-phishing landing page, then went 
+            # away and logged in again, then were pushed back to here) we 
+            # need to offer to complete that. Otherwise, just show a message.
+            orequest = self.extract_incomplete_orequest(request)
+            if orequest:
+                return self.show_decide(request, orequest)
             return self.show_this_is_an_openid_server(request)
         
         if orequest.mode in ("checkid_immediate", "checkid_setup"):
@@ -145,4 +173,6 @@ class Provider(object):
         return self.server_response(request, oresponse)
     
     def show_this_is_an_openid_server(self, request):
+        # This view serves a du
+        
         return self.render(request, self.this_is_a_server_template)
