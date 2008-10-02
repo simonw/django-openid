@@ -63,12 +63,15 @@ class Provider(object):
         response = self.render(request, self.landing_page_template, {
             'identity_url': orequest.identity,
         })
+        self.stash_incomplete_orequest(request, response, orequest)
+        return response
+    
+    def stash_incomplete_orequest(self, request, response, orequest):
         response.set_cookie(
             self.incomplete_orequest_cookie_key, signed.dumps(
                 orequest, extra_salt = self.orequest_salt
             )
         )
-        return response
     
     def show_error(self, request, message):
         return self.render(request, self.error_template, {
