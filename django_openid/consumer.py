@@ -171,7 +171,7 @@ Fzk0lpcjIQA7""".strip()
             namespace = self.extension_namespaces.get(namespace, namespace)
             auth_request.addExtensionArg(namespace, key, value)
     
-    def do_login(self, request):
+    def do_login(self, request, next_override=None):
         if request.method == 'GET':
             return self.show_login(request)
         
@@ -200,11 +200,15 @@ Fzk0lpcjIQA7""".strip()
         except ValueError:
             next = None
         
+        # next_override parameter over-rides the above
+        if next_override:
+            next = next_override
+        
         # Signed ?next= from the URL takes precedent
         if next:
             on_complete_url = (
                 request.build_absolute_uri() + 'complete/?next=' + 
-                request.POST['next']
+                self.sign_done(next)
             )
         else:
             on_complete_url = self.on_complete_url or \
