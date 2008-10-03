@@ -29,7 +29,7 @@ class AuthRegistration(AuthConsumer):
     def do_index(self, request, message=None):
         # The index is a registration / signup form, provided the user is not 
         # already logged in
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous():
             return self.show_already_signed_in(request)
         
         # Spot incoming openid_url authentication requests
