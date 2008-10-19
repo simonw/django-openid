@@ -4,18 +4,7 @@ from django.conf import settings
 
 import urlparse
 
-def display_login_form_openid(bind_to_me, openid_path):
-    # Monkey-patch for the admin
-    "openid_path is the path the OpenID login should submit to, e.g. /openid/"
-    from django.contrib.admin.sites import AdminSite
-    def display_login_form(request, error_message='', 
-            extra_context=None):
-        extra_context = extra_context or {}
-        extra_context['openid_path'] = openid_path
-        return AdminSite.display_login_form(
-            bind_to_me, request, error_message, extra_context
-        )
-    return display_login_form
+# TODO: prevent multiple associations of same OPenID
 
 class AuthConsumer(consumer.SessionConsumer):
     """
@@ -47,6 +36,7 @@ class AuthConsumer(consumer.SessionConsumer):
         )
     
     def log_in_user(self, request, user, openid):
+        # Remember, openid might be None (after registration with none set)
         from django.contrib.auth import login
         # Nasty but necessary - annotate user and pretend it was the regular 
         # auth backend. This is needed so django.contrib.auth.get_user works:
@@ -55,10 +45,16 @@ class AuthConsumer(consumer.SessionConsumer):
         return self.on_login_complete(request, user, openid)
     
     def on_login_complete(self, request, user, openid):
-        return Redirect(self.after_login_redirect_url)
+        response = self.redirect_if_valid_next(request)
+        if not response:
+            response = Redirect(self.after_login_redirect_url)
+        return response
     
     def already_logged_in(self, request, openid):
-        return Redirect(self.after_login_redirect_url)
+        response = self.redirect_if_valid_next(request)
+        if not response:
+            response = Redirect(self.after_login_redirect_url)
+        return response
     
     def on_logged_in(self, request, openid, openid_response):
         # Do we recognise their OpenID?
@@ -81,6 +77,13 @@ class AuthConsumer(consumer.SessionConsumer):
         else:
             # We don't know anything about this openid
             return self.show_unknown_openid(request, openid)
+    
+    def on_logged_out(self, request):
+        # After logging out the OpenID, log out the user auth session too
+        from django.contrib.auth import logout
+        response = super(AuthConsumer, self).on_logged_out(request)
+        logout(request)
+        return response
     
     def show_unknown_openid(self, request, openid):
         # This can be over-ridden to show a registration form
@@ -181,3 +184,22 @@ class AuthConsumer(consumer.SessionConsumer):
             'action_new': '../',
             'associate_next': self.sign_done(request.path),
         })
+
+# Monkey-patch to add openid login form to the Django admin
+def make_display_login_form_with_openid(bind_to_me, openid_path):
+    "openid_path is the path the OpenID login should submit to, e.g. /openid/"
+    from django.contrib.admin.sites import AdminSite
+    def display_login_form(request, error_message='', 
+            extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['openid_path'] = openid_path
+        return AdminSite.display_login_form(
+            bind_to_me, request, error_message, extra_context
+        )
+    return display_login_form
+
+def monkeypatch_adminsite(admin_site, openid_path = '/openid/'):
+    admin_site.display_login_form = make_display_login_form_with_openid(
+        admin_site, openid_path
+    )
+

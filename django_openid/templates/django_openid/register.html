@@ -1,0 +1,63 @@
+{% extends base_template %}
+
+{% block title %}Register an account{% endblock %}
+
+{% block extra_head %}
+<style type="text/css">
+input.openid {
+  background: url({{ logo }}) no-repeat; 
+  background-position: 0 50%;
+  padding-left: 16px;
+  width: 20em;
+}
+div.field-wrapper {
+    clear: both;
+    margin-bottom: 0.5em;
+    width: 32em;
+}
+.errors input {
+    background-color: pink;
+}
+div.field-wrapper label {
+    width: 9em;
+    float: left;
+    clear: left;
+}
+div.field-wrapper input {
+    width: 20em;
+}
+input#id_username {
+    width: 12em;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Register an account</h1>
+{% if openid %}
+    <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="logout/?next={{ no_thanks }}">no thanks</a>)</p>
+{% else %}
+<h2>Start with your OpenID</h2>
+<form action="{{ action }}" method="POST">
+    <p><label for="openid_url">Got an OpenID? Log in with it now:</label>
+        <input type="text" class="openid" name="openid_url" id="openid_url">
+        <input type="submit" value="Log in">
+    </p>
+</form>
+{% endif %}
+<h2>OR enter your details</h2>
+<form action="{{ action }}" method="POST">
+{% with form.username as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% with form.first_name as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% with form.last_name as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% with form.email as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% if openid %}
+<p>Since you are using OpenID you don't need to set a password. You can set one later if you want.</p>
+{% else %}
+{% with form.password as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% with form.password2 as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
+{% endif %}
+<p><input type="submit"></p>
+</form>
+
+{% endblock %}

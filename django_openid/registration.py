@@ -3,18 +3,22 @@ from django import forms
 
 from django_openid.auth import AuthConsumer
 
+import urlparse, re
+
 class AuthRegistration(AuthConsumer):
     already_signed_in_message = 'You are already signed in to this site'
     unknown_openid_message = \
         'That OpenID is not recognised. Would you like to create an account?'
+    registration_complete_message = 'Your account has been created'
     
     register_template = 'django_openid/register.html'
     
-    after_registration_url = '/'
+    after_registration_url = None # None means "show a message instead"
     
     # Registration options
     validate_email_address = True
     allow_non_openid_signups = True
+    reserved_usernames = ['security', 'info', 'admin']
     
     # sreg
     sreg = ['nickname', 'email', 'fullname']
@@ -26,8 +30,8 @@ class AuthRegistration(AuthConsumer):
     def get_registration_form_class(self, request):
         return RegistrationForm
     
-    def do_index(self, request, message=None):
-        # The index is a registration / signup form, provided the user is not 
+    def do_register(self, request, message=None):
+        # Show a registration / signup form, provided the user is not 
         # already logged in
         if not request.user.is_anonymous():
             return self.show_already_signed_in(request)
@@ -43,27 +47,41 @@ class AuthRegistration(AuthConsumer):
         if request.method == 'POST':
             # TODO: The user might have entered an OpenID as a starting point,
             # or they might have decided to sign up normally
-            form = RegistrationForm(request.POST, openid = openid)
+            form = RegistrationForm(
+                request.POST,
+                openid = openid,
+                reserved_usernames = self.reserved_usernames,
+            )
             if form.is_valid():
                 user = self.save_form(form)
                 # If they are logged in with an OpenID, associate it
                 if openid:
                     user.openids.create(openid = openid)
                 # Now log that new user in
+                
+                # TODO: Don't do this directly. Instead, refactor out the 
+                # bit that does the actual logging in bit then return 
+                # self.on_registration_complete - which defaults to just 
+                # showing a message (self.registration_complete_message) 
+                # but can also redirect if self.after_registration_url has 
+                # been defined.
                 return self.log_in_user(request, user, openid)
         else:
             form = RegistrationForm(
                 initial = request.openid and self.initial_from_sreg(
                     request.openid.sreg
                 ) or {},
-                openid = openid
+                openid = openid,
+                reserved_usernames = self.reserved_usernames,
             )
         
         return self.render(request, self.register_template, {
             'form': form,
             'message': message,
             'openid': request.openid,
-            'logo': self.logo_path or (request.path + 'logo/'),
+            'logo': self.logo_path or (urlparse.urljoin(
+                request.path, '../logo/'
+            )),
             'no_thanks': self.sign_done(request.path),
             'action': request.path,
         })
@@ -115,16 +133,28 @@ from django.contrib.auth.models import User
 class RegistrationForm(forms.ModelForm):
     no_password_error = 'You must either set a password or attach an OpenID'
     password_mismatch_error = 'Your passwords do not match'
+    invalid_username_error = 'Usernames must consist of letters and numbers'
+    reserved_username_error = 'That username cannot be registered'
+    
+    username_re = re.compile('^[a-zA-Z0-9]+$')
     
     # Additional required fields (above what the User model says)
     extra_required = ('first_name', 'last_name', 'email')
     
     def __init__(self, *args, **kwargs):
-        "Accepts openid as optional keyword argument, for password validation"
+        """
+        Accepts openid as optional keyword argument, for password validation.
+        Also accepts optional reserved_usernames keyword argument which is a
+        list of usernames that should not be registered (e.g. 'security')
+        """
         try:
             self.openid = kwargs.pop('openid')
         except KeyError:
             self.openid = None
+        try:
+            self.reserved_usernames = kwargs.pop('reserved_usernames')
+        except KeyError:
+            self.reserved_usernames = []
         
         # Super's __init__ creates self.fields for us
         super(RegistrationForm, self).__init__(*args, **kwargs)
@@ -136,8 +166,25 @@ class RegistrationForm(forms.ModelForm):
         model = User
         fields = ('username', 'first_name', 'last_name', 'email')
     
-    password = forms.CharField(widget = forms.PasswordInput, required=False)
-    password2 = forms.CharField(widget = forms.PasswordInput, required=False)
+    # Password fields are NOT required as a general rule; we only validate 
+    # that they have set a password if an OpenID is not being associated
+    password = forms.CharField(
+        widget = forms.PasswordInput,
+        required=False
+    )
+    password2 = forms.CharField(
+        widget = forms.PasswordInput,
+        required=False,
+        label="Confirm password"
+    )
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username', '')
+        if not self.username_re.match(username):
+            raise forms.ValidationError, self.invalid_username_error
+        if username in self.reserved_usernames:
+            raise forms.ValidationError, self.reserved_username_error
+        return username
     
     def clean_password(self):
         "Password is only required if no OpenID was specified"
@@ -169,20 +216,3 @@ class RegistrationForm(forms.ModelForm):
             user.set_password(password)
             user.save()
         return user
-
-#class RegistrationForm(forms.Form):
-#    username
-#    password
-#    blah
-#    blah
-#
-#class RegistrationConsumer(Consumer):
-#    
-#    
-#    def do_index(self, request):
-#        # If they are logged in already, don't let them register
-#        if not request.user.is_anonymous:
-#            return self.show_already_signed_in(request)
-#    
-#    
-#    
