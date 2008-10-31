@@ -1,17 +1,8 @@
 django_openid
 
-django_openid provides tools for dealing with OpenID in your Django applications, with smart default settings designed to get you up and running as quickly as possible combined with simple hooks for customising any aspect of the OpenID flow.
+django_openid provides everything you need to handle OpenID logins in your Django applications. The default settings are designed to get you up and running as quickly as possible, while finely grained extension hooks allow advanced users to customise every aspect of the OpenID flow.
 
-Using django_openid, you can:
-
-* Ask a user to log in with their OpenID, and perform a custom action once their identity has been confirmed.
-* Persist a user's identity (using either sessions or a signed cookie) so that they can log in once with their OpenID before accessing other pages of your site.
-* Request additional information about the user from their OpenID provider, such as their preferred nickname, e-mail address or date of birth, using the sreg OpenID extension.
-* Accept both version 1.1 and version 2.0 of the OpenID protocol.
-* Allow users to sign in to their django.contrib.auth User accounts using an OpenID, or associate one or more OpenIDs with their existing account.
-* Give your users OpenIDs hosted by your own site, by acting as an OpenID provider.
-
-Installation
+== Installation ==
 
 1. Check out django_openid somewhere on your Python path:
 
@@ -21,9 +12,9 @@ svn co http://django-openid.googlecode.com/svn/trunk/django_openid django_openid
 
 3. Run ./manage.py syncdb to install the database tables required by django_openid. (It is possible to run django_openid without using a database at all; see elsewhere in the documentation for details).
 
-Consuming OpenID
+== Accepting OpenID logins ==
 
-We'll talk about the most common case first: you want people to be able to sign in to your site using OpenID, and you want to keep them signed in somehow.
+If you just want users to be able to sign in to your application with an OpenID, you have two options: SessionConsumer and CookieConsumer. SessionConsumer uses Django's session framework; most people will probably want to use this. If you don't want to use Django's sessions, CookieConsumer is an alternative that uses signed cookies instead.
 
 Add the following to your urls.py:
 
@@ -85,6 +76,16 @@ urlpatterns = patterns('',
     (r'^openid/(.*)', MyConsumer()),
 )
 
+Using django_openid, you can:
+
+* Ask a user to log in with their OpenID, and perform a custom action once their identity has been confirmed.
+* Persist a user's identity (using either sessions or a signed cookie) so that they can log in once with their OpenID before accessing other pages of your site.
+* Request additional information about the user from their OpenID provider, such as their preferred nickname, e-mail address or date of birth, using the sreg OpenID extension.
+* Accept both version 1.1 and version 2.0 of the OpenID protocol.
+* Allow users to sign in to their django.contrib.auth User accounts using an OpenID, or associate one or more OpenIDs with their existing account.
+* Give your users OpenIDs hosted by your own site, by acting as an OpenID provider.
+
+
 Requesting sreg information about your user
 
 The OpenID simple registration extension allows you to request additional profile information from your user's OpenID provider. Available fields are nickname, email, fullname, dob, gender, postcode, country, language, timezone.
@@ -145,4 +146,6 @@ The CookieConsumer uses signed cookies to store the user's OpenID, including the
 Using django_openid without a database
 
 Under the hood, django_openid uses the JanRain OpenID library. This library needs to store book-keeping information about the current active OpenID request somewhere. By default, django_openid stores this in the database - that's why you need to run ./manage.py syncdb when you install it.
+
+To use a different 
 

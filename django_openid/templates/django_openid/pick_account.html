@@ -1,0 +1,16 @@
+{% extends base_template %}
+
+{% block title %}Which account would you like?{% endblock %}
+
+{% block content %}
+<h1>Which account would you like?</h1>
+
+<p>The OpenID <strong>{{ openid }}</strong> is associated with {{ users|length }} different accounts. Which user do you wish to sign in as?</p>
+
+<form action="{{ action }}" method="POST">
+{% for user in users %}
+    <p><input type="submit" name="user-{{ user.id }}" value="{{ user }}"></p>
+{% endfor %}
+</form>
+
+{% endblock %}

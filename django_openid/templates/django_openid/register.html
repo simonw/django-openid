@@ -35,7 +35,7 @@ input#id_username {
 {% block content %}
 <h1>Register an account</h1>
 {% if openid %}
-    <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="logout/?next={{ no_thanks }}">no thanks</a>)</p>
+    <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="../logout/?next={{ no_thanks }}">no thanks</a>)</p>
 {% else %}
 <h2>Start with your OpenID</h2>
 <form action="{{ action }}" method="POST">
@@ -45,7 +45,7 @@ input#id_username {
     </p>
 </form>
 {% endif %}
-<h2>OR enter your details</h2>
+<h2>{% if not openid %}OR enter{% else %}Enter{% endif %} your details</h2>
 <form action="{{ action }}" method="POST">
 {% with form.username as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
 {% with form.first_name as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}

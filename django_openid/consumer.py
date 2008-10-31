@@ -125,8 +125,8 @@ Fzk0lpcjIQA7""".strip()
             raise Http404, 'No do_%s method' % part
         return getattr(self, 'do_%s' % part)(request)
     
-    def do_index(self, request):
-        return self.do_login(request)
+    def do_index(self, request, extra_message=None):
+        return self.do_login(request, extra_message)
     
     def show_login(self, request, message=None):
         try:
@@ -171,9 +171,11 @@ Fzk0lpcjIQA7""".strip()
             namespace = self.extension_namespaces.get(namespace, namespace)
             auth_request.addExtensionArg(namespace, key, value)
     
-    def do_login(self, request, next_override=None):
+    def do_login(self, request, extra_message=None, 
+            next_override=None, oncomplete_override=None,
+            trust_root_override=None):
         if request.method == 'GET':
-            return self.show_login(request)
+            return self.show_login(request, extra_message)
         
         user_url = request.POST.get('openid_url', None)
         if not user_url:
@@ -191,8 +193,6 @@ Fzk0lpcjIQA7""".strip()
         except DiscoveryFailure:
             return self.show_error(request, self.openid_invalid_message)
         
-        trust_root = self.trust_root or request.build_absolute_uri()
-        
         try:
             next = signed.loads(
                 request.POST.get('next', ''), extra_salt=self.salt_next
@@ -204,15 +204,25 @@ Fzk0lpcjIQA7""".strip()
         if next_override:
             next = next_override
         
-        # Signed ?next= from the URL takes precedent
+        # Figure out the URL we should be sent back to
+        on_complete_url = oncomplete_override or \
+            self.on_complete_url or \
+            request.path + 'complete/'
+        
+        # If it isn't a full URL already, use build_absolute_uri on it
+        on_complete_url = self.ensure_absolute_url(request, on_complete_url)
+        
+        # If a 'next' has been provided, add that to on_complete_url as well
         if next:
-            on_complete_url = (
-                request.build_absolute_uri() + 'complete/?next=' + 
-                self.sign_done(next)
-            )
-        else:
-            on_complete_url = self.on_complete_url or \
-                request.build_absolute_uri() + 'complete/'
+            if '?' not in on_complete_url:
+                on_complete_url += '?next=' + self.sign_done(next)
+            else:
+                on_complete_url += '&next=' + self.sign_done(next)
+        
+        # trust_root should be a full URL
+        trust_root = trust_root_override or self.trust_root or \
+            request.build_absolute_uri()
+        trust_root = self.ensure_absolute_url(request, trust_root)
         
         self.add_extension_args(request, auth_request)
         
@@ -258,12 +268,15 @@ Fzk0lpcjIQA7""".strip()
     
     def redirect_if_valid_next(self, request):
         "Logic for checking if a signed ?next= token is included in request"
+        print "redirect_if_valid_next"
         try:
             next = signed.loads(
                 request.REQUEST.get('next', ''), extra_salt=self.salt_next
             )
+            print "  ... redirecting"
             return HttpResponseRedirect(next)
         except ValueError:
+            print "  ... no valid next token %s" % request.REQUEST.get('next')
             return None
     
     def on_success(self, request, identity_url, openid_response):
@@ -289,6 +302,11 @@ Fzk0lpcjIQA7""".strip()
         return HttpResponse(
             self.OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
         )
+    
+    def ensure_absolute_url(self, request, url):
+        if not (url.startswith('http://') or url.startswith('https://')):
+            url = request.build_absolute_uri(url)
+        return url
 
 class LoginConsumer(Consumer):
     redirect_after_login = '/'

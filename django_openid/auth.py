@@ -78,6 +78,34 @@ class AuthConsumer(consumer.SessionConsumer):
             # We don't know anything about this openid
             return self.show_unknown_openid(request, openid)
     
+    def show_pick_account(self, request, openid):
+        """
+        The user's OpenID is associated with more than one account - ask them
+        which one they would like to sign in as
+        """
+        return self.render(request, 'django_openid/pick_account.html', {
+            'action': urlparse.urljoin(request.path, '../pick/'),
+            'openid': openid,
+            'users': self.lookup_openid(request, openid),
+        })
+    
+    def do_pick(self, request):
+        # User MUST be logged in with an OpenID and it MUST be associated
+        # with the selected account. The error messages in here are a bit 
+        # weird, unfortunately.
+        if not request.openid:
+            return self.show_error(request, 'You should be logged in here')
+        users = self.lookup_openid(request, request.openid.openid)
+        try:
+            user_id = [
+                v.split('-')[1] for v in request.POST if v.startswith('user-')
+            ][0]
+            user = [u for u in users if str(u.id) == user_id][0]
+        except IndexError, e:
+            return self.show_error(request, "You didn't pick a valid user")
+        # OK, log them in
+        return self.log_in_user(request, user, request.openid.openid)
+    
     def on_logged_out(self, request):
         # After logging out the OpenID, log out the user auth session too
         from django.contrib.auth import logout

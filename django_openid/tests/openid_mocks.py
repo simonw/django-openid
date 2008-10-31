@@ -3,6 +3,7 @@ Mock objects for the bits of the OpenID flow that would normally involve
 communicating with an external service.
 """
 from django_openid.consumer import Consumer, SessionConsumer, CookieConsumer
+from django_openid.auth import AuthConsumer
 
 class MockSession(dict):
     def __init__(self, **kwargs):
@@ -73,4 +74,7 @@ class MySessionConsumer(MyConsumerMixin, SessionConsumer):
     pass
 
 class MyCookieConsumer(MyConsumerMixin, CookieConsumer):
+    pass
+
+class MyAuthConsumer(MyConsumerMixin, AuthConsumer):
     pass

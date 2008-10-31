@@ -17,7 +17,6 @@ class AuthRegistration(AuthConsumer):
     
     # Registration options
     validate_email_address = True
-    allow_non_openid_signups = True
     reserved_usernames = ['security', 'info', 'admin']
     
     # sreg
@@ -38,7 +37,13 @@ class AuthRegistration(AuthConsumer):
         
         # Spot incoming openid_url authentication requests
         if request.POST.get('openid_url', None):
-            return self.do_login(request, next_override=request.path)
+            return self.do_login(request, 
+                next_override = request.path,
+                oncomplete_override = urlparse.urljoin(
+                    request.path, '../complete/'
+                ),
+                trust_root_override = urlparse.urljoin(request.path, '..')
+            )
         
         RegistrationForm = self.get_registration_form_class(request)
         
