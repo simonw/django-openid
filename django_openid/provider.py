@@ -1,10 +1,8 @@
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render_to_response
-
 from openid.server.server import Server
 from openid.extensions import sreg
-
 from django_openid.models import DjangoOpenIDStore
 from django_openid import signed
 
@@ -176,6 +174,4 @@ class Provider(object):
         return self.server_response(request, oresponse)
     
     def show_this_is_an_openid_server(self, request):
-        # This view serves a du
-        
         return self.render(request, self.this_is_a_server_template)

@@ -16,6 +16,10 @@ input.openid {
 {% block content %}
 <h1>Log in with your OpenID</h1>
 
+{% if message %}
+<p>{{ message }}</p>
+{% endif %}
+
 <form action="{{ action }}" method="post">
 <p>
     <input class="openid" type="text" name="openid_url">

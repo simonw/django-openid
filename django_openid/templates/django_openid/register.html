@@ -34,6 +34,11 @@ input#id_username {
 
 {% block content %}
 <h1>Register an account</h1>
+
+{% if message %}
+<p>{{ message }}</p>
+{% endif %}
+
 {% if openid %}
     <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="../logout/?next={{ no_thanks }}">no thanks</a>)</p>
 {% else %}

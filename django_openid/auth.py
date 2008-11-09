@@ -35,14 +35,13 @@ class AuthConsumer(consumer.SessionConsumer):
             User.objects.filter(openids__openid = identity_url).distinct()
         )
     
-    def log_in_user(self, request, user, openid):
+    def log_in_user(self, request, user):
         # Remember, openid might be None (after registration with none set)
         from django.contrib.auth import login
         # Nasty but necessary - annotate user and pretend it was the regular 
         # auth backend. This is needed so django.contrib.auth.get_user works:
         user.backend = 'django.contrib.auth.backends.ModelBackend'
         login(request, user)
-        return self.on_login_complete(request, user, openid)
     
     def on_login_complete(self, request, user, openid):
         response = self.redirect_if_valid_next(request)
@@ -70,7 +69,8 @@ class AuthConsumer(consumer.SessionConsumer):
         if matches:
             # If there's only one match, log them in as that user
             if len(matches) == 1:
-                return self.log_in_user(request, matches[0], openid)
+                self.log_in_user(request, matches[0])
+                return self.on_login_complete(request, matches[0], openid)
             # Otherwise, let them to pick which account they want to log in as
             else:
                 return self.show_pick_account(request, openid)
@@ -104,7 +104,8 @@ class AuthConsumer(consumer.SessionConsumer):
         except IndexError, e:
             return self.show_error(request, "You didn't pick a valid user")
         # OK, log them in
-        return self.log_in_user(request, user, request.openid.openid)
+        self.log_in_user(request, user)
+        return self.on_login_complete(request, user, request.openid.openid)
     
     def on_logged_out(self, request):
         # After logging out the OpenID, log out the user auth session too

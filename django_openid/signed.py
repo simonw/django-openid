@@ -54,7 +54,7 @@ def dumps(obj, secret = None, compress = False, extra_salt = ''):
         if len(compressed) < (len(pickled) - 1):
             pickled = compressed
             is_compressed = True
-    base64d = base64.urlsafe_b64encode(pickled).strip('=')
+    base64d = encode(pickled).strip('=')
     if is_compressed:
         base64d = '.' + base64d
     return sign(base64d, (secret or settings.SECRET_KEY) + extra_salt)
@@ -72,11 +72,17 @@ def loads(s, secret = None, extra_salt = ''):
         # It's compressed; uncompress it first
         base64d = base64d[1:]
         decompress = True
-    pickled = base64.urlsafe_b64decode(base64d + '=' * (len(base64d) % 4))
+    pickled = decode(base64d)
     if decompress:
         import zlib
         pickled = zlib.decompress(pickled)
     return pickle.loads(pickled)
+
+def encode(s):
+    return base64.urlsafe_b64encode(s).strip('=')
+
+def decode(s):
+    return base64.urlsafe_b64decode(s + '=' * (len(s) % 4))
 
 class BadSignature(ValueError):
     # Extends ValueError, which makes it more convenient to catch and has 

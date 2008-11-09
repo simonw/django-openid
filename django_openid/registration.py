@@ -2,10 +2,13 @@ from django.http import HttpResponseRedirect
 from django import forms
 
 from django_openid.auth import AuthConsumer
+from django_openid.utils import OpenID
+
+from openid.consumer import consumer
 
 import urlparse, re
 
-class AuthRegistration(AuthConsumer):
+class RegistrationConsumer(AuthConsumer):
     already_signed_in_message = 'You are already signed in to this site'
     unknown_openid_message = \
         'That OpenID is not recognised. Would you like to create an account?'
@@ -29,6 +32,60 @@ class AuthRegistration(AuthConsumer):
     def get_registration_form_class(self, request):
         return RegistrationForm
     
+    def show_i_have_logged_you_in(self, request):
+        return self.show_message(
+            request, 'You are logged in',
+            'You already have an account for that OpenID. ' + 
+            'You are now logged in.'
+        )
+    
+    def do_register_complete(self, request):
+        
+        def on_success(request, identity_url, openid_response):
+            # We need to behave differently from the default AuthConsumer
+            # success behaviour. For simplicity, we do the following:
+            # 1. "Log them in" as that OpenID i.e. stash it in the session
+            # 2. If it's already associated with an account, log them in as 
+            #    that account and show a message.
+            # 2. If NOT already associated, redirect back to /register/ again
+            openid_object = OpenID.from_openid_response(openid_response)
+            matches = self.lookup_openid(request, identity_url)
+            if matches:
+                # Log them in and show the message
+                self.log_in_user(request, matches[0])
+                response = self.show_i_have_logged_you_in(request)
+            else:
+                response = HttpResponseRedirect(urlparse.urljoin(
+                    request.path, '../register/'
+                ))
+            self.persist_openid(request, response, openid_object)
+            return response
+        
+        return self.dispatch_openid_complete(request, {
+            consumer.SUCCESS: on_success,
+            consumer.CANCEL: 
+                lambda request, openid_response: self.do_register(request, 
+                    message = self.request_cancelled_message
+                ),
+            consumer.FAILURE: 
+                lambda request, openid_response: self.do_register(request, 
+                    message = self.failure_message % openid_response.message
+                ),
+            consumer.SETUP_NEEDED: 
+                lambda request, openid_response: self.do_register(request, 
+                    message = self.setup_needed_message
+                ),
+        })
+    
+    def on_registration_complete(self, request):
+        if self.after_registration_url:
+            return HttpResponseRedirect(self.after_registration_url)
+        else:
+            return self.show_message(
+                request, 'Registration complete', 
+                self.registration_complete_message
+            )
+    
     def do_register(self, request, message=None):
         # Show a registration / signup form, provided the user is not 
         # already logged in
@@ -37,17 +94,22 @@ class AuthRegistration(AuthConsumer):
         
         # Spot incoming openid_url authentication requests
         if request.POST.get('openid_url', None):
-            return self.do_login(request, 
-                next_override = request.path,
-                oncomplete_override = urlparse.urljoin(
-                    request.path, '../complete/'
+            return self.start_openid_process(request,
+                user_url = request.POST.get('openid_url'),
+                on_complete_url = urlparse.urljoin(
+                    request.path, '../register_complete/'
                 ),
-                trust_root_override = urlparse.urljoin(request.path, '..')
+                trust_root = urlparse.urljoin(request.path, '..')
             )
         
         RegistrationForm = self.get_registration_form_class(request)
         
-        openid = request.openid and request.openid.openid or None
+        try:
+            openid = request.openid and request.openid.openid or None
+        except AttributeError:
+            return self.show_error(
+                request, 'Add CookieConsumer or similar to your middleware'
+            )
         
         if request.method == 'POST':
             # TODO: The user might have entered an OpenID as a starting point,
@@ -58,19 +120,10 @@ class AuthRegistration(AuthConsumer):
                 reserved_usernames = self.reserved_usernames,
             )
             if form.is_valid():
-                user = self.save_form(form)
-                # If they are logged in with an OpenID, associate it
-                if openid:
-                    user.openids.create(openid = openid)
+                user = self.save_form(form) # Also associates the OpenID
                 # Now log that new user in
-                
-                # TODO: Don't do this directly. Instead, refactor out the 
-                # bit that does the actual logging in bit then return 
-                # self.on_registration_complete - which defaults to just 
-                # showing a message (self.registration_complete_message) 
-                # but can also redirect if self.after_registration_url has 
-                # been defined.
-                return self.log_in_user(request, user, openid)
+                self.log_in_user(request, user)
+                return self.on_registration_complete(request)
         else:
             form = RegistrationForm(
                 initial = request.openid and self.initial_from_sreg(
