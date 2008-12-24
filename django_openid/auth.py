@@ -4,7 +4,7 @@ from django.conf import settings
 
 import urlparse
 
-# TODO: prevent multiple associations of same OPenID
+# TODO: prevent multiple associations of same OpenID
 
 class AuthConsumer(consumer.SessionConsumer):
     """
@@ -69,14 +69,25 @@ class AuthConsumer(consumer.SessionConsumer):
         if matches:
             # If there's only one match, log them in as that user
             if len(matches) == 1:
-                self.log_in_user(request, matches[0])
-                return self.on_login_complete(request, matches[0], openid)
+                user = matches[0]
+                if self.user_can_login(request, user):
+                    self.log_in_user(request, user)
+                    return self.on_login_complete(request, user, openid)
+                else:
+                    # User is not allowed to log in for some other reason - 
+                    # for example, they have not yet validated their e-mail 
+                    # or they have been banned from the site.
+                    return self.show_you_cannot_login(request, user, openid)
             # Otherwise, let them to pick which account they want to log in as
             else:
                 return self.show_pick_account(request, openid)
         else:
             # We don't know anything about this openid
             return self.show_unknown_openid(request, openid)
+    
+    def user_can_login(self, request, user):
+        "Over-ride for things like user bans or account e-mail validation"
+        return user.is_active
     
     def show_pick_account(self, request, openid):
         """
@@ -118,6 +129,11 @@ class AuthConsumer(consumer.SessionConsumer):
         # This can be over-ridden to show a registration form
         return self.show_message(
             request, 'Unknown OpenID', '%s is an unknown OpenID' % openid
+        )
+    
+    def show_you_cannot_login(self, request, user, openid):
+        return self.show_message(
+            request, 'You cannot log in', 'You cannot log in with that account'
         )
     
     def show_associate(self, request, openid=None):
