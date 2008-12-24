@@ -261,9 +261,9 @@ class RegistrationForm(forms.ModelForm):
     def save(self):
         user = User.objects.create(
             username = self.cleaned_data['username'],
-            first_name = self.cleaned_data.get('first_name'),
-            last_name = self.cleaned_data.get('last_name'),
-            email = self.cleaned_data.get('email'),
+            first_name = self.cleaned_data.get('first_name', ''),
+            last_name = self.cleaned_data.get('last_name', ''),
+            email = self.cleaned_data.get('email', ''),
         )
         # Set OpenID, if one has been associated
         if self.openid:
