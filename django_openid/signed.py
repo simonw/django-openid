@@ -36,7 +36,7 @@ These functions make use of all of them.
 
 import pickle, base64
 from django.conf import settings
-from django.utils.hashcompat import sha1_constructor
+from django.utils.hashcompat import sha_constructor
 
 def dumps(obj, secret = None, compress = False, extra_salt = ''):
     """
