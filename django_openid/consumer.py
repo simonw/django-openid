@@ -19,7 +19,7 @@ from openid.yadis import xri
 from django_openid.models import DjangoOpenIDStore
 from django_openid.utils import OpenID
 from django_openid import signed
-from django_openid.response import RequestTemplateResponse
+from django_openid.response import TemplateResponse
 
 class SessionUserSessionMixin(object):
     def get_user_session(self, request):
@@ -109,7 +109,7 @@ Fzk0lpcjIQA7""".strip()
     def render(self, request, template, context=None):
         context = context or {}
         context['base_template'] = self.base_template
-        return RequestTemplateResponse(request, template, context)
+        return TemplateResponse(request, template, context)
     
     def __call__(self, request, rest_of_url=''):
         if not request.path.endswith('/'):
