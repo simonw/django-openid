@@ -15,6 +15,7 @@ class RegistrationConsumer(AuthConsumer):
     registration_complete_message = 'Your account has been created'
     
     register_template = 'django_openid/register.html'
+    set_password_template = 'django_openid/set_password.html'
     
     after_registration_url = None # None means "show a message instead"
     
@@ -26,6 +27,7 @@ class RegistrationConsumer(AuthConsumer):
     sreg = ['nickname', 'email', 'fullname']
     
     RegistrationForm = forms.RegistrationFormPasswordConfirm
+    ChangePasswordForm = forms.ChangePasswordForm
     
     def save_form(self, form):
         user = form.save()
@@ -33,6 +35,9 @@ class RegistrationConsumer(AuthConsumer):
     
     def get_registration_form_class(self, request):
         return self.RegistrationForm
+    
+    def get_change_password_form_class(self, request):
+        return self.ChangePasswordForm
     
     def show_i_have_logged_you_in(self, request):
         return self.show_message(
@@ -145,6 +150,30 @@ class RegistrationConsumer(AuthConsumer):
             'no_thanks': self.sign_done(request.path),
             'action': request.path,
         })
+    
+    def do_password(self, request):
+        "Allow users to set a password on their account"
+        if request.user.is_anonymous():
+            return self.show_error(request, 'You need to log in first')
+        ChangePasswordForm = self.get_change_password_form_class(request)
+        if request.method == 'POST':
+            form = ChangePasswordForm(request.user, data=request.POST)
+            if form.is_valid():
+                u = request.user
+                u.set_password(form.cleaned_data['password'])
+                u.save()
+                return self.show_password_has_been_set(request)
+        else:
+            form = ChangePasswordForm(request.user)
+        return self.render(request, self.set_password_template, {
+            'form': form,
+            'action': request.path,
+        })
+    
+    def show_password_has_been_set(self, request):
+        return self.show_message(
+            request, 'Password set', 'Your password has been set.'
+        )
     
     def initial_from_sreg(self, sreg):
         "Maps sreg to data for populating registration form"

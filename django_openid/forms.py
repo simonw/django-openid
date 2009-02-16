@@ -75,7 +75,9 @@ class RegistrationForm(forms.ModelForm):
         password = self.cleaned_data.get('password')
         if password:
             user.set_password(password)
-            user.save()
+        else:
+            user.set_unusable_password()
+        user.save()
         return user
 
 class RegistrationFormPasswordConfirm(RegistrationForm):
@@ -86,6 +88,41 @@ class RegistrationFormPasswordConfirm(RegistrationForm):
         required = False,
         label = "Confirm password"
     )
+    
+    def clean_password2(self):
+        password = self.cleaned_data.get('password', '')
+        password2 = self.cleaned_data.get('password2', '')
+        if password and (password != password2):
+            raise forms.ValidationError, self.password_mismatch_error
+        return password2
+
+class ChangePasswordForm(forms.Form):
+    password = forms.CharField(
+        widget = forms.PasswordInput,
+        required = True
+    )
+    password2 = forms.CharField(
+        widget = forms.PasswordInput,
+        required = True,
+        label = 'Confirm password'
+    )
+    password_mismatch_error = 'Your passwords do not match'
+    password_incorrect_error = 'Your password is incorrect'
+    
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super(ChangePasswordForm, self).__init__(*args, **kwargs)
+        if self.user.has_usable_password() and self.user.password:
+            # Only ask for their old password if they have set it already
+            self.fields['old_password'] = forms.CharField(
+                widget = forms.PasswordInput,
+                required = True
+            )
+    
+    def clean_old_password(self):
+        password = self.cleaned_data.get('old_password', '')
+        if not self.user.check_password(password):
+            raise forms.ValidationError, self.password_incorrect_error
     
     def clean_password2(self):
         password = self.cleaned_data.get('password', '')
