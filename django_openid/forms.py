@@ -7,6 +7,7 @@ class RegistrationForm(forms.ModelForm):
     no_password_error = 'You must either set a password or attach an OpenID'
     invalid_username_error = 'Usernames must consist of letters and numbers'
     reserved_username_error = 'That username cannot be registered'
+    duplicate_email_error = 'That e-mail address is already in use'
     
     username_re = re.compile('^[a-zA-Z0-9]+$')
     
@@ -27,6 +28,10 @@ class RegistrationForm(forms.ModelForm):
             self.reserved_usernames = kwargs.pop('reserved_usernames')
         except KeyError:
             self.reserved_usernames = []
+        try:
+            self.no_duplicate_emails = kwargs.pop('no_duplicate_emails')
+        except KeyError:
+            self.no_duplicate_emails = False
         
         # Super's __init__ creates self.fields for us
         super(RegistrationForm, self).__init__(*args, **kwargs)
@@ -60,6 +65,13 @@ class RegistrationForm(forms.ModelForm):
             raise forms.ValidationError, self.no_password_error
         return password
     
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '')
+        if self.no_duplicate_emails and User.objects.filter(
+            email = email
+        ).count() > 0:
+            raise forms.ValidationError, self.duplicate_email_error
+        return email
     
     def save(self):
         user = User.objects.create(
