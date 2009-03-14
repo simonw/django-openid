@@ -103,7 +103,7 @@ AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
 EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
 Fzk0lpcjIQA7""".strip()
     
-    def sign_done(self, url):
+    def sign_next(self, url):
         return signed.dumps(url, extra_salt = self.salt_next)
     
     def render(self, request, template, context=None):
@@ -116,13 +116,24 @@ Fzk0lpcjIQA7""".strip()
             return HttpResponseRedirect(request.path + '/')
         
         # Dispatch based on path component
-        part = rest_of_url.split('/')[0]
+        bits = rest_of_url.split('/')
+        part = bits[0]
+        rest = '/'.join(bits[1:])
         
         if not part:
             return self.do_index(request)
+        
         if not hasattr(self, 'do_%s' % part):
             raise Http404, 'No do_%s method' % part
-        return getattr(self, 'do_%s' % part)(request)
+        
+        method = getattr(self, 'do_%s' % part)
+        
+        if getattr(method, 'accepts_rest_of_path', False):
+            return method(request, rest or '')
+        elif rest:
+            raise Http404, 'URL had extra unwanted stuff on it'
+        else:
+            return method(request)
     
     def do_index(self, request, extra_message=None):
         return self.do_login(request, extra_message)
@@ -184,9 +195,9 @@ Fzk0lpcjIQA7""".strip()
             return on_complete_url
         
         if '?' not in on_complete_url:
-            on_complete_url += '?next=' + self.sign_done(next)
+            on_complete_url += '?next=' + self.sign_next(next)
         else:
-            on_complete_url += '&next=' + self.sign_done(next)
+            on_complete_url += '&next=' + self.sign_next(next)
         return on_complete_url
     
     def get_trust_root(self, request, trust_root=None):

@@ -1,8 +1,12 @@
 from django.http import HttpResponseRedirect as Redirect
 from django_openid import consumer, signed
 from django.conf import settings
+from django.contrib.auth import authenticate
 
-import urlparse
+import urlparse, hashlib, datetime
+
+hex_to_int = lambda s: int(s, 16)
+int_to_hex = lambda i: hex(i).replace('0x', '')
 
 # TODO: prevent multiple associations of same OpenID
 
@@ -15,6 +19,11 @@ class AuthConsumer(consumer.SessionConsumer):
     after_login_redirect_url = '/'
     
     associations_template = 'django_openid/associations.html'
+    login_plus_password_template = 'django_openid/login_plus_password.html'
+    recover_template = 'django_openid/recover.html'
+    
+    password_logins_enabled = True
+    account_recovery_enabled = True
     
     need_authenticated_user_message = 'You need to sign in with an ' \
         'existing user account to access this page.'
@@ -23,9 +32,46 @@ class AuthConsumer(consumer.SessionConsumer):
     association_deleted_message = '%s has been deleted'
     openid_now_associated_message = \
         'The OpenID "%s" is now associated with your account.'
+    bad_password_message = 'Incorrect username or password'
+    invalid_token_message = 'Invalid token'
+    
+    account_recovery_url = None
     
     associate_salt = 'associate-salt'
     associate_delete_salt = 'associate-delete-salt'
+    recovery_link_salt = 'recovery-link-salt'
+    recovery_link_secret = None # If None, uses settings.SECRET_KEY
+    
+    # For generating recovery URLs
+    recovery_origin_date = datetime.date(2000, 1, 1)
+    recovery_expires_after = 3 # Number of days recovery URL is valid for
+    
+    def show_login(self, request, extra_message=None):
+        response = super(AuthConsumer, self).show_login(request, extra_message)
+        if self.password_logins_enabled:
+            response.template = self.login_plus_password_template
+            response.context.update({
+                'account_recovery': self.account_recovery_enabled and (
+                    self.account_recovery_url or (request.path + 'recover/')
+                ),
+            })
+        return response
+    
+    def do_login(self, request, extra_message=None):
+        if request.method == 'POST' and \
+                request.POST.get('username', '').strip():
+            # Do a username/password login instead
+            user = authenticate(
+                username = request.POST.get('username'),
+                password = request.POST.get('password')
+            )
+            if not user:
+                return self.show_login(request, self.bad_password_message)
+            else:
+                self.log_in_user(request, user)
+                return self.on_login_complete(request, user, openid=None)
+        else:
+            return super(AuthConsumer, self).do_login(request, extra_message)
     
     def lookup_openid(self, request, identity_url):
         # Imports lives inside this method so User won't get imported if you 
@@ -43,7 +89,7 @@ class AuthConsumer(consumer.SessionConsumer):
         user.backend = 'django.contrib.auth.backends.ModelBackend'
         login(request, user)
     
-    def on_login_complete(self, request, user, openid):
+    def on_login_complete(self, request, user, openid=None):
         response = self.redirect_if_valid_next(request)
         if not response:
             response = Redirect(self.after_login_redirect_url)
@@ -227,8 +273,60 @@ class AuthConsumer(consumer.SessionConsumer):
             'action': request.path,
             'message': message,
             'action_new': '../',
-            'associate_next': self.sign_done(request.path),
+            'associate_next': self.sign_next(request.path),
         })
+    
+    def do_recover(self, request, extra_message = None):
+        if request.method == 'POST':
+            submitted = request.POST.get('recover', '')
+            if '@' in submitted:
+                # Look up all users with that e-mail address
+                # If more than one, tell user to enter a username instead
+                pass
+            else:
+                # Look up user with that username
+                # ... self.send_recovery_email(request, user)
+                pass
+        else:
+            return self.render(request, self.recover_template, {
+                'action': request.path,
+                'message': extra_message,
+            })
+    
+    def do_r(self, request, token = ''):
+        if token:
+            token = token.rstrip('/').encode('utf8')
+            try:
+                value = signed.unsign(token, key = (
+                    self.recovery_link_secret or settings.SECRET_KEY
+                ) + self.recovery_link_salt)
+            except signed.BadSignature:
+                return self.show_message(
+                    request, self.invalid_token_message,
+                    self.invalid_token_message + ': ' + token
+                )
+            hex_days, hex_user_id = (value.split('.') + ['', ''])[:2]
+            days = hex_to_int(hex_days)
+            user_id = hex_to_int(hex_user_id)
+            assert False, (days, user_id)
+    
+    do_r.accepts_rest_of_path = True
+    
+    def generate_recovery_code(self, user):
+        # Code is {hex-days}.{hex-userid}.{signature}
+        days = int_to_hex(
+            (datetime.date.today() - self.recovery_origin_date).days
+        )
+        token = '%s.%s' % (days, int_to_hex(user.id))
+        return signed.sign(token, key = (
+            self.recovery_link_secret or settings.SECRET_KEY
+        ) + self.recovery_link_salt)
+    
+    def send_recovery_email(self, request, user):
+        # Use self.recovery_email_template 
+        # Generate clever link
+        # URL is /account/r/recovery-code
+        pass
 
 # Monkey-patch to add openid login form to the Django admin
 def make_display_login_form_with_openid(bind_to_me, openid_path):

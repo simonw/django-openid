@@ -21,6 +21,7 @@ class RegistrationConsumer(AuthConsumer):
     
     # Registration options
     validate_email_address = True
+    no_duplicate_emails = True
     reserved_usernames = ['security', 'info', 'admin']
     
     # sreg
@@ -125,6 +126,7 @@ class RegistrationConsumer(AuthConsumer):
                 request.POST,
                 openid = openid,
                 reserved_usernames = self.reserved_usernames,
+                no_duplicate_emails = self.no_duplicate_emails
             )
             if form.is_valid():
                 user = self.save_form(form) # Also associates the OpenID
@@ -138,6 +140,7 @@ class RegistrationConsumer(AuthConsumer):
                 ) or {},
                 openid = openid,
                 reserved_usernames = self.reserved_usernames,
+                no_duplicate_emails = self.no_duplicate_emails
             )
         
         return self.render(request, self.register_template, {
@@ -147,7 +150,7 @@ class RegistrationConsumer(AuthConsumer):
             'logo': self.logo_path or (urlparse.urljoin(
                 request.path, '../logo/'
             )),
-            'no_thanks': self.sign_done(request.path),
+            'no_thanks': self.sign_next(request.path),
             'action': request.path,
         })
     

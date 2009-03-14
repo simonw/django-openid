@@ -62,7 +62,7 @@ class ConsumerTest(TestCase):
         )
         get = rf.get('/openid/complete/', {
             'openid-args': 'go-here',
-            'next': openid_consumer.sign_done('/foo/')
+            'next': openid_consumer.sign_next('/foo/')
         })
         get.session = MockSession()
         response = openid_consumer(get, 'complete/')
