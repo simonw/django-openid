@@ -111,4 +111,4 @@ def unsign(signed_value, key = None):
         raise BadSignature, 'Signature failed: %s' % sig
 
 def base64_sha1(s):
-    return base64.urlsafe_b64encode(hashlib.sha1(s).digest()).strip('=')
+    return encode(hashlib.sha1(s).digest())
