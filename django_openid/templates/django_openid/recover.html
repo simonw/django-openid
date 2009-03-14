@@ -1,0 +1,19 @@
+{% extends base_template %}
+
+{% block title %}Recover your account{% endblock %}
+
+{% block content %}
+<h1>Can't log in?</h1>
+
+{% if message %}
+<p>{{ message }}</p>
+{% endif %}
+
+<p>Enter your username or e-mail address and we'll send you a link to recover your account.</p>
+
+<form action="{{ action }}" method="post">
+<p>
+    <label for="id_recover">Username / E-mail:</label> <input id="id_recover" type="text" name="recover"> <input type="submit" value="Recover account">
+</p>
+</form>
+{% endblock %}
