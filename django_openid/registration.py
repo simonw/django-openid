@@ -30,10 +30,6 @@ class RegistrationConsumer(AuthConsumer):
     RegistrationForm = forms.RegistrationFormPasswordConfirm
     ChangePasswordForm = forms.ChangePasswordForm
     
-    def save_form(self, form):
-        user = form.save()
-        return user
-    
     def get_registration_form_class(self, request):
         return self.RegistrationForm
     
@@ -129,7 +125,7 @@ class RegistrationConsumer(AuthConsumer):
                 no_duplicate_emails = self.no_duplicate_emails
             )
             if form.is_valid():
-                user = self.save_form(form) # Also associates the OpenID
+                user = self.create_user(form.cleaned_data, openid)
                 # Now log that new user in
                 self.log_in_user(request, user)
                 return self.on_registration_complete(request)
@@ -153,6 +149,26 @@ class RegistrationConsumer(AuthConsumer):
             'no_thanks': self.sign_next(request.path),
             'action': request.path,
         })
+    
+    def create_user(self, data, openid=None):
+        from django.contrib.auth.models import User
+        user = User.objects.create(
+            username = data['username'],
+            first_name = data.get('first_name', ''),
+            last_name = data.get('last_name', ''),
+            email = data.get('email', ''),
+        )
+        # Set OpenID, if one has been associated
+        if openid:
+            user.openids.create(openid = openid)
+        # Set password, if one has been specified
+        password = data.get('password')
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        return user
     
     def do_password(self, request):
         "Allow users to set a password on their account"

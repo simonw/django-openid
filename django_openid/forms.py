@@ -72,25 +72,6 @@ class RegistrationForm(forms.ModelForm):
         ).count() > 0:
             raise forms.ValidationError, self.duplicate_email_error
         return email
-    
-    def save(self):
-        user = User.objects.create(
-            username = self.cleaned_data['username'],
-            first_name = self.cleaned_data.get('first_name', ''),
-            last_name = self.cleaned_data.get('last_name', ''),
-            email = self.cleaned_data.get('email', ''),
-        )
-        # Set OpenID, if one has been associated
-        if self.openid:
-            user.openids.create(openid = self.openid)
-        # Set password, if one has been specified
-        password = self.cleaned_data.get('password')
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
-        user.save()
-        return user
 
 class RegistrationFormPasswordConfirm(RegistrationForm):
     password_mismatch_error = 'Your passwords do not match'
