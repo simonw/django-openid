@@ -1,9 +1,10 @@
 from django.db import models
 from django.conf import settings
+from django.utils.hashcompat import md5_constructor
 from openid.store.interface import OpenIDStore
 import openid.store
 from openid.association import Association as OIDAssociation
-import time, base64, md5
+import time, base64
 
 class Nonce(models.Model):
     server_url = models.CharField(max_length=255)
@@ -108,7 +109,7 @@ class DjangoOpenIDStore(OpenIDStore):
     
     def getAuthKey(self):
         # Use first AUTH_KEY_LEN characters of md5 hash of SECRET_KEY
-        return md5.new(settings.SECRET_KEY).hexdigest()[:self.AUTH_KEY_LEN]
+        return md5_constructor.new(settings.SECRET_KEY).hexdigest()[:self.AUTH_KEY_LEN]
     
     def isDumb(self):
         return False
