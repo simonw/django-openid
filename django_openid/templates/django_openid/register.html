@@ -39,19 +39,8 @@ input#id_username {
 <p>{{ message }}</p>
 {% endif %}
 
-{% if openid %}
-    <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="../logout/?next={{ no_thanks }}">no thanks</a>)</p>
-{% else %}
-<h2>Start with your OpenID</h2>
-<form action="{{ action }}" method="POST">
-    <p><label for="openid_url">Got an OpenID? Log in with it now:</label>
-        <input type="text" class="openid" name="openid_url" id="openid_url">
-        <input type="submit" value="Log in">
-    </p>
-</form>
-{% endif %}
-<h2>{% if not openid %}OR enter{% else %}Enter{% endif %} your details</h2>
-<form action="{{ action }}" method="POST">
+<h2>Enter your details</h2>
+<form action="{{ action }}" method="post">
 {% with form.username as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
 {% with form.first_name as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
 {% with form.last_name as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
@@ -62,7 +51,20 @@ input#id_username {
 {% with form.password as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
 {% with form.password2 as field %}{% include "django_openid/_register_form_field.html" %}{% endwith %}
 {% endif %}
-<p><input type="submit" value="Submit"></p>
+<p><input type="submit" value="Register"></p>
+{% if openid %}
+    <p>Your OpenID <strong>{{ openid }}</strong> will be associated with this account. (<a href="../logout/?next={{ no_thanks }}">no thanks</a>)</p>
+{% else %}
+<h2>Or start by entering your OpenID</h2>
+<form action="{{ action }}" method="post">
+    <p><label for="openid_url">Got an OpenID? Log in with it now:</label>
+        <input type="text" class="openid" name="openid_url" id="openid_url">
+    </p>
+    <p>
+        <input type="submit" value="Register with OpenID">
+    </p>
+</form>
+{% endif %}
 </form>
 
 {% endblock %}
