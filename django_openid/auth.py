@@ -47,7 +47,13 @@ class AuthConsumer(consumer.SessionConsumer):
     recovery_expires_after = 3 # Number of days recovery URL is valid for
     
     def show_login(self, request, extra_message=None):
-        response = super(AuthConsumer, self).show_login(request, extra_message)
+        if request.user.is_authenticated():
+            return self.show_already_logged_in(request)
+        
+        response = super(AuthConsumer, self).show_login(
+            request, extra_message
+        )
+        
         if self.password_logins_enabled:
             response.template = self.login_plus_password_template
             response.context.update({
@@ -56,6 +62,9 @@ class AuthConsumer(consumer.SessionConsumer):
                 ),
             })
         return response
+    
+    def show_already_logged_in(self, request):
+        return self.render(request, 'django_openid/already_logged_in.html') 
     
     def do_login(self, request, extra_message=None):
         if request.method == 'POST' and \
@@ -95,12 +104,6 @@ class AuthConsumer(consumer.SessionConsumer):
             response = Redirect(self.after_login_redirect_url)
         return response
     
-    def already_logged_in(self, request, openid):
-        response = self.redirect_if_valid_next(request)
-        if not response:
-            response = Redirect(self.after_login_redirect_url)
-        return response
-    
     def on_logged_in(self, request, openid, openid_response):
         # Do we recognise their OpenID?
         matches = self.lookup_openid(request, openid)
@@ -108,7 +111,10 @@ class AuthConsumer(consumer.SessionConsumer):
         if request.user.is_authenticated():
             # Did we find their account already? If so, ignore login
             if request.user.id in [u.id for u in matches]:
-                return self.already_logged_in(request, openid)
+                response = self.redirect_if_valid_next(request)
+                if not response:
+                    response = Redirect(self.after_login_redirect_url)
+                return response
             else:
                 # Offer to associate this OpenID with their account
                 return self.show_associate(request, openid)
