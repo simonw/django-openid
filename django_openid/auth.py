@@ -21,6 +21,9 @@ class AuthConsumer(consumer.SessionConsumer):
     associations_template = 'django_openid/associations.html'
     login_plus_password_template = 'django_openid/login_plus_password.html'
     recover_template = 'django_openid/recover.html'
+    already_logged_in_template = 'django_openid/already_logged_in.html'
+    pick_account_template = 'django_openid/pick_account.html'
+    show_associate_template = 'django_openid/associate.html'
     
     password_logins_enabled = True
     account_recovery_enabled = True
@@ -64,7 +67,7 @@ class AuthConsumer(consumer.SessionConsumer):
         return response
     
     def show_already_logged_in(self, request):
-        return self.render(request, 'django_openid/already_logged_in.html') 
+        return self.render(request, self.already_logged_in_template) 
     
     def do_login(self, request, extra_message=None):
         if request.method == 'POST' and \
@@ -146,7 +149,7 @@ class AuthConsumer(consumer.SessionConsumer):
         The user's OpenID is associated with more than one account - ask them
         which one they would like to sign in as
         """
-        return self.render(request, 'django_openid/pick_account.html', {
+        return self.render(request, self.pick_account_template, {
             'action': urlparse.urljoin(request.path, '../pick/'),
             'openid': openid,
             'users': self.lookup_openid(request, openid),
@@ -198,7 +201,7 @@ class AuthConsumer(consumer.SessionConsumer):
             )
         except ValueError:
             next = ''
-        return self.render(request, 'django_openid/associate.html', {
+        return self.render(request, self.show_associate_template, {
             'action': urlparse.urljoin(request.path, '../associate/'),
             'user': request.user,
             'specific_openid': openid,
