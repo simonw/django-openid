@@ -1,12 +1,13 @@
-from django.http import HttpResponseRedirect as Redirect
+from django.http import HttpResponseRedirect as Redirect, Http404
 from django_openid import consumer, signed
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.mail import send_mail
 
 import urlparse, hashlib, datetime
 
 hex_to_int = lambda s: int(s, 16)
-int_to_hex = lambda i: hex(i).replace('0x', '')
+int_to_hex = lambda i: hex(i).replace('0x', '').lower().replace('l', '')
 
 # TODO: prevent multiple associations of same OpenID
 
@@ -24,6 +25,9 @@ class AuthConsumer(consumer.SessionConsumer):
     already_logged_in_template = 'django_openid/already_logged_in.html'
     pick_account_template = 'django_openid/pick_account.html'
     show_associate_template = 'django_openid/associate.html'
+    recovery_email_template = 'django_openid/recovery_email.txt'
+    
+    recovery_email_from = None
     
     password_logins_enabled = True
     account_recovery_enabled = True
@@ -37,6 +41,7 @@ class AuthConsumer(consumer.SessionConsumer):
         'The OpenID "%s" is now associated with your account.'
     bad_password_message = 'Incorrect username or password'
     invalid_token_message = 'Invalid token'
+    recovery_email_sent_message = 'Check your mail for further instructions'
     
     account_recovery_url = None
     
@@ -188,7 +193,8 @@ class AuthConsumer(consumer.SessionConsumer):
     
     def show_you_cannot_login(self, request, user, openid):
         return self.show_message(
-            request, 'You cannot log in', 'You cannot log in with that account'
+            request, 'You cannot log in',
+            'You cannot log in with that account'
         )
     
     def show_associate(self, request, openid=None):
@@ -287,37 +293,69 @@ class AuthConsumer(consumer.SessionConsumer):
     
     def do_recover(self, request, extra_message = None):
         if request.method == 'POST':
-            submitted = request.POST.get('recover', '')
-            if '@' in submitted:
-                # Look up all users with that e-mail address
-                # If more than one, tell user to enter a username instead
-                pass
-            else:
+            submitted = request.POST.get('recover', '').strip()
+            user = None
+            if '@' not in submitted:
                 # Look up user with that username
-                # ... self.send_recovery_email(request, user)
-                pass
-        else:
-            return self.render(request, self.recover_template, {
-                'action': request.path,
-                'message': extra_message,
-            })
+                user = self.lookup_user_by_username(submitted)
+            else:
+                # Look up all users with that e-mail address
+                users = self.lookup_users_by_email(submitted)
+                if users:
+                    # If more than one, tell user to enter a username instead
+                    if len(users) > 1:
+                        extra_message = 'Try entering your username instead'
+                    else:
+                        user = users[0]
+            if user:
+                self.send_recovery_email(request, user)
+                return self.show_message(
+                    request, 'E-mail sent', self.recovery_email_sent_message
+                )
+        return self.render(request, self.recover_template, {
+            'action': request.path,
+            'message': extra_message,
+        })
+    
+    def lookup_users_by_email(self, email):
+        from django.contrib.auth.models import User
+        return list(User.objects.filter(email = email))
+    
+    def lookup_user_by_username(self, username):
+        from django.contrib.auth.models import User
+        try:
+            return User.objects.get(username = username)
+        except User.DoesNotExist:
+            return None
+    
+    def lookup_user_by_id(self, id):
+        from django.contrib.auth.models import User
+        try:
+            return User.objects.get(pk = id)
+        except User.DoesNotExist:
+            return None
     
     def do_r(self, request, token = ''):
-        if token:
-            token = token.rstrip('/').encode('utf8')
-            try:
-                value = signed.unsign(token, key = (
-                    self.recovery_link_secret or settings.SECRET_KEY
-                ) + self.recovery_link_salt)
-            except signed.BadSignature:
-                return self.show_message(
-                    request, self.invalid_token_message,
-                    self.invalid_token_message + ': ' + token
-                )
-            hex_days, hex_user_id = (value.split('.') + ['', ''])[:2]
-            days = hex_to_int(hex_days)
-            user_id = hex_to_int(hex_user_id)
-            assert False, (days, user_id)
+        if not token:
+            raise Http404
+        token = token.rstrip('/').encode('utf8')
+        try:
+            value = signed.unsign(token, key = (
+                self.recovery_link_secret or settings.SECRET_KEY
+            ) + self.recovery_link_salt)
+        except signed.BadSignature:
+            return self.show_message(
+                request, self.invalid_token_message,
+                self.invalid_token_message + ': ' + token
+            )
+        hex_days, hex_user_id = (value.split('.') + ['', ''])[:2]
+        days = hex_to_int(hex_days)
+        user_id = hex_to_int(hex_user_id)
+        user = self.lookup_user_by_id(user_id)
+        if not user:
+            raise Http404, 'User not found for ID %s' % user_id
+        
+        assert False, (days, user_id)
     
     do_r.accepts_rest_of_path = True
     
@@ -332,10 +370,21 @@ class AuthConsumer(consumer.SessionConsumer):
         ) + self.recovery_link_salt)
     
     def send_recovery_email(self, request, user):
-        # Use self.recovery_email_template 
-        # Generate clever link
-        # URL is /account/r/recovery-code
-        pass
+        code = self.generate_recovery_code(user)
+        path = urlparse.urljoin(request.path, '../r/%s/' % code)
+        url = request.build_absolute_uri(path)
+        email_body = self.render(request, self.recovery_email_template, {
+            'url': url,
+            'code': code,
+            'user': user,
+        }).content
+        send_email(
+            subject = self.recovery_email_subject,
+            message = email_body,
+            from_email = self.recovery_email_from or \
+                settings.DEFAULT_FROM_EMAIL,
+            recipient_list = [user.email]
+        )
 
 # Monkey-patch to add openid login form to the Django admin
 def make_display_login_form_with_openid(bind_to_me, openid_path):

@@ -1,0 +1,3 @@
+Visit this page to recover your account:
+
+{{ url }}
