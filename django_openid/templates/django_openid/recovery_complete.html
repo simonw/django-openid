@@ -1,0 +1,14 @@
+{% extends base_template %}
+
+{% block title %}Account recovered{% endblock %}
+
+{% block content %}
+<h2>Account recovered</h2>
+
+<p>You are now logged in as <strong>{{ user }}</strong></p>
+
+<ul>
+    <li><a href="{{ change_password_url }}">Reset your password</a></li>
+    <li><a href="{{ associate_url }}">Associate an OpenID with your account</a></li>
+</ul>
+{% endblock %}

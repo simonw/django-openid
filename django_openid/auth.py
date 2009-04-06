@@ -4,7 +4,8 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 
-import urlparse, hashlib, datetime
+import hashlib, datetime
+from urlparse import urljoin
 
 hex_to_int = lambda s: int(s, 16)
 int_to_hex = lambda i: hex(i).replace('0x', '').lower().replace('l', '')
@@ -26,6 +27,8 @@ class AuthConsumer(consumer.SessionConsumer):
     pick_account_template = 'django_openid/pick_account.html'
     show_associate_template = 'django_openid/associate.html'
     recovery_email_template = 'django_openid/recovery_email.txt'
+    recovery_expired_template = 'django_openid/recovery_expired.html'
+    recovery_complete_template = 'django_openid/recovery_complete.html'
     
     recovery_email_from = None
     
@@ -42,6 +45,7 @@ class AuthConsumer(consumer.SessionConsumer):
     bad_password_message = 'Incorrect username or password'
     invalid_token_message = 'Invalid token'
     recovery_email_sent_message = 'Check your mail for further instructions'
+    r_user_not_found_message = 'That user account does not exist'
     
     account_recovery_url = None
     
@@ -52,7 +56,7 @@ class AuthConsumer(consumer.SessionConsumer):
     
     # For generating recovery URLs
     recovery_origin_date = datetime.date(2000, 1, 1)
-    recovery_expires_after = 3 # Number of days recovery URL is valid for
+    recovery_expires_after_days = 3 # Number of days recovery URL is valid for
     
     def show_login(self, request, extra_message=None):
         if request.user.is_authenticated():
@@ -155,7 +159,7 @@ class AuthConsumer(consumer.SessionConsumer):
         which one they would like to sign in as
         """
         return self.render(request, self.pick_account_template, {
-            'action': urlparse.urljoin(request.path, '../pick/'),
+            'action': urljoin(request.path, '../pick/'),
             'openid': openid,
             'users': self.lookup_openid(request, openid),
         })
@@ -208,7 +212,7 @@ class AuthConsumer(consumer.SessionConsumer):
         except ValueError:
             next = ''
         return self.render(request, self.show_associate_template, {
-            'action': urlparse.urljoin(request.path, '../associate/'),
+            'action': urljoin(request.path, '../associate/'),
             'user': request.user,
             'specific_openid': openid,
             'next': next and request.REQUEST.get('next', '') or None,
@@ -295,16 +299,14 @@ class AuthConsumer(consumer.SessionConsumer):
         if request.method == 'POST':
             submitted = request.POST.get('recover', '').strip()
             user = None
-            if '@' not in submitted:
-                # Look up user with that username
+            if '@' not in submitted: # They entered a username
                 user = self.lookup_user_by_username(submitted)
-            else:
-                # Look up all users with that e-mail address
+            else: # They entered an e-mail address
                 users = self.lookup_users_by_email(submitted)
                 if users:
-                    # If more than one, tell user to enter a username instead
                     if len(users) > 1:
                         extra_message = 'Try entering your username instead'
+                        user = None
                     else:
                         user = users[0]
             if user:
@@ -337,6 +339,7 @@ class AuthConsumer(consumer.SessionConsumer):
     
     def do_r(self, request, token = ''):
         if not token:
+            # TODO: show a form where they can paste in their token?
             raise Http404
         token = token.rstrip('/').encode('utf8')
         try:
@@ -352,10 +355,24 @@ class AuthConsumer(consumer.SessionConsumer):
         days = hex_to_int(hex_days)
         user_id = hex_to_int(hex_user_id)
         user = self.lookup_user_by_id(user_id)
-        if not user:
-            raise Http404, 'User not found for ID %s' % user_id
+        if not user: # Maybe the user was deleted?
+            return self.show_error(request, r_user_not_found_message)
         
-        assert False, (days, user_id)
+        # Has the token expired?
+        now_days = (datetime.date.today() - self.recovery_origin_date).days
+        if (now_days - days) > self.recovery_expires_after_days:
+            return self.render(request, self.recovery_expired_template, {
+                'days': self.recovery_expires_after_days,
+                'recover_url': urljoin(request.path, '../../recover/'),
+            })
+        
+        # Token is valid! Log them in as that user and show the recovery page
+        self.log_in_user(request, user)
+        return self.render(request, self.recovery_complete_template, {
+            'change_password_url': urljoin(request.path, '../../password/'),
+            'associate_url': urljoin(request.path, '../../associations/'),
+            'user': user,
+        })
     
     do_r.accepts_rest_of_path = True
     
@@ -371,7 +388,7 @@ class AuthConsumer(consumer.SessionConsumer):
     
     def send_recovery_email(self, request, user):
         code = self.generate_recovery_code(user)
-        path = urlparse.urljoin(request.path, '../r/%s/' % code)
+        path = urljoin(request.path, '../r/%s/' % code)
         url = request.build_absolute_uri(path)
         email_body = self.render(request, self.recovery_email_template, {
             'url': url,
