@@ -289,15 +289,12 @@ Fzk0lpcjIQA7""".strip()
     
     def redirect_if_valid_next(self, request):
         "Logic for checking if a signed ?next= token is included in request"
-        print "redirect_if_valid_next"
         try:
             next = signed.loads(
                 request.REQUEST.get('next', ''), extra_salt=self.salt_next
             )
-            print "  ... redirecting"
             return HttpResponseRedirect(next)
         except ValueError:
-            print "  ... no valid next token %s" % request.REQUEST.get('next')
             return None
     
     def on_success(self, request, identity_url, openid_response):
