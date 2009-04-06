@@ -160,7 +160,9 @@ class CookieConsumerTest(TestCase):
         self.assertEqual(response['Location'], '/')
         # Decrypt the cookie and check it's the right thing
         cookie = response.cookies['openid'].value
-        openid = signed.loads(cookie)
+        openid = signed.loads(
+            cookie, extra_salt = MyCookieConsumer().extra_salt
+        )
         self.assertEqual(openid.openid, 'http://simonwillison.net/')
     
     def testLogout(self):

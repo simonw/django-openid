@@ -22,4 +22,4 @@ class AuthTest(TestCase):
         self.two_openid.openids.create(openid = 'http://c.example.com/')
     
     def testLogin(self):
-        
+        pass
