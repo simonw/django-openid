@@ -1,3 +1,4 @@
+from openid.extensions import sreg
 from openid.yadis import xri
 import datetime
 
@@ -21,5 +22,5 @@ class OpenID:
         return cls(
             openid = openid_response.identity_url,
             issued = datetime.datetime.now(),
-            sreg = openid_response.extensionResponse('sreg', False)
+            reg = sreg.SRegResponse.fromSuccessResponse(openid_response),
         )
