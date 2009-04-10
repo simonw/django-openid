@@ -1,0 +1,11 @@
+:mod:`django_openid.auth`
+=========================
+
+Integrating OpenID with Django auth.
+
+.. module:: django_openid.auth
+
+.. autoclass:: AuthConsumer
+    :members:
+    :undoc-members:
+    :show-inheritance:

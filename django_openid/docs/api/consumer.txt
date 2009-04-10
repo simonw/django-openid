@@ -1,0 +1,10 @@
+:mod:`django_openid.consumer`
+=============================
+
+Accepting OpenID logins.
+
+.. module:: django_openid.consumer
+
+.. autoclass:: Consumer
+    :members:
+    :undoc-members:

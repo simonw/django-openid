@@ -1,0 +1,14 @@
+Installation
+============
+
+1. Install `python-openid`_ version 2.2.1 or later.
+
+2. Check out django_openid somewhere on your Python path::
+
+    svn co http://django-openid.googlecode.com/svn/trunk/django_openid django_openid
+
+3. Add ``'django_openid'`` to the ``INSTALLED_APPS`` setting for your project.
+
+4. Run ``./manage.py syncdb`` to install the database tables required by django_openid. (It is possible to run django_openid without using a database at all; see elsewhere in the documentation for details).
+
+.. _python-openid: http://openidenabled.com/python-openid/

@@ -1,0 +1,10 @@
+:mod:`django_openid.provider`
+=============================
+
+Implement an OpenID provider.
+
+.. module:: django_openid.provider
+
+.. autoclass:: Provider
+    :members:
+    :undoc-members:

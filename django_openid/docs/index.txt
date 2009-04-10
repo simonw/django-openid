@@ -1,0 +1,35 @@
+django_openid
+=============
+
+**django_openid** provides everything you need to handle `OpenID`_ logins in your Django applications. The default settings are designed to get you up and running as quickly as possible, while finely grained extension hooks allow advanced users to customise every aspect of the OpenID flow.
+
+.. _OpenID: http://openid.net/
+
+.. toctree::
+   :maxdepth: 2
+   
+   installation
+   accepting-openid
+   
+   api/index
+
+========
+Features
+========
+
+Using django_openid, you can:
+
+* Ask a user to **log in with OpenID**, and perform a custom action once their identity has been confirmed.
+* **Persist a user's identity** (using either sessions or a signed cookie) so that they can log in once with their OpenID before accessing other pages of your site.
+* **Request additional information** about the user from their OpenID provider, such as their preferred nickname, e-mail address or date of birth, using the sreg OpenID extension.
+* Accept **both versions 1.1 and 2.0** of the OpenID protocol.
+* Allow users to **sign in to their django.contrib.auth User accounts** using an OpenID, or **associate one or more OpenIDs** with their existing account.
+* Give your users OpenIDs hosted by your own site, by acting as an **OpenID provider**.
+
+==================
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

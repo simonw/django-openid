@@ -1,0 +1,11 @@
+:mod:`django_openid.registration`
+=================================
+
+Allow users to register new user accounts with or without an OpenID.
+
+.. module:: django_openid.registration
+
+.. autoclass:: RegistrationConsumer
+    :show-inheritance:
+    :members:
+    :undoc-members:

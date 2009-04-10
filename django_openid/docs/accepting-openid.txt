@@ -1,0 +1,136 @@
+Accepting OpenID
+================
+
+If you just want users to be able to sign in to your application with an OpenID, you have two options: SessionConsumer and CookieConsumer. SessionConsumer uses Django's session framework; most people will probably want to use this. If you don't want to use Django's sessions, CookieConsumer is an alternative that uses signed cookies instead.
+
+Add the following to your urls.py::
+
+    from django_openid.consumer import SessionConsumer
+    
+    urlpatterns = patterns('',
+        # ...
+        (r'^openid/(.*)', SessionConsumer()),
+    )
+
+You'll need to have Django's session framework installed. 
+
+Now, if you visit yoursite.example.com/openid/ you will be presented with an OpenID login form. Sign in with OpenID and you will be redirected back to your site's homepage. An OpenID object representing your OpenID will be stored in the session, in request.session['openids'][0]
+
+If you sign in again with a different OpenID, it will be appended to the end of the request.session['openids'] list.
+
+You can access the authenticated OpenID as a unicode string with the following::
+
+    request.session['openids'][-1].openid
+
+For a more convenient API for accessing the OpenID, enable the SessionConsumer Django middleware. Add the following to your MIDDLEWARE_CLASSES setting::
+
+    MIDDLEWARE_CLASSES = (
+        'django.middleware.common.CommonMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        # ...
+        'django_openid.consumer.SessionConsumer',
+    )
+
+The SessionConsumer middleware must come after the SessionMiddleware as it needs access to the session.
+
+With the middleware installed, you can access the user's OpenID using a property on the request object itself::
+
+    if request.openid:
+        # The user is signed in with an OpenID
+        return HttpResponse("You are signed in as %s" % request.openid.openid)
+
+request.openids is a list of signed in OpenIDs, if the user has signed in with more than one.
+
+To log out (deleting the OpenIDs from the session), simply visit /openid/logout/ on your site.
+
+If you only want to sign out with one, specific OpenID use the following link instead:
+
+/openid/logout/?openid=http://specific-openid.example.com/
+
+==========================
+Redirecting somewhere else
+==========================
+
+If you don't want to redirect your users to the homepage once they have logged in, you can customise the redirect URL with your own SessionConsumer subclass::
+
+    from django_openid.consumer import SessionConsumer
+
+    class MyConsumer(SessionConsumer):
+        redirect_after_login = '/welcome/'
+
+Then simply map that class in your urlconf instead::
+
+    urlpatterns = patterns('',
+        # ...
+        (r'^openid/(.*)', MyConsumer()),
+    )
+
+===========================================
+Requesting sreg information about your user
+===========================================
+
+The OpenID simple registration extension allows you to request additional profile information from your user's OpenID provider. Available fields are nickname, email, fullname, dob, gender, postcode, country, language, timezone.
+
+Remember, while you can request any or all of those fields there are absolutely no guarantees that the OpenID provider will fulfill your request. This is despite the inclusion of so-called 'required' fields in the sreg specification. The best way to use sreg data is to pre-populate a sign-up form that is displayed to users with OpenIDs that you haven't seen before.
+
+That said, requesting sreg information is easy - simply add an sreg property to your SessionConsumer subclass::
+
+    class MyConsumer(SessionConsumer):
+        redirect_after_login = '/welcome/'
+        sreg = ['nickname', 'email', 'dob', 'postcode']
+
+Assuming your user's OpenID provider supports sreg and your user opts in to sending you that data, you'll be able to access it using the request.openid.sreg dictionary::
+
+    def view(request):
+        if request.openid:
+            nickname = request.openid.sreg.get('nickname', '')
+            email = request.openid.sreg.get('email', '')
+            # etc
+
+=========================
+Customising the templates
+=========================
+
+django_openid ships with default templates that are functional but plain looking. There are a number of different ways in which you can customise them.
+
+All of the templates extend a common base template. By default, this is 'django_openid/base.html' which can be found in the django_openid/templates directory. You can over-ride this template by adding one with the same path to one of the directories in your TEMPLATE_DIRS setting. You'll need to define blocks called "title" and "content", fitting the Django convention.
+
+If you already have a base template for your project that fits these naming conventions, you can use it by setting the base_template attribute on your custom subclass::
+
+    class MyConsumer(SessionConsumer):
+        redirect_after_login = '/welcome/'
+        sreg = ['nickname', 'email', 'dob', 'postcode']
+    
+        base_template = 'path/to/base.html'
+
+django_openid provides plenty of other class attributes that you can over-ride in your subclass, including attributes for selecting different templates for different views and attributes for customising the default error messages shown to your users. Explore the source code for details.
+
+=========================================
+Using regular cookies instead of sessions
+=========================================
+
+If you don't want to use Django's built-in session support you can still use django_openid in much the same way as with the SessionConsumer, thanks to the CookieConsumer class. It is configured in exactly the same way::
+
+    from django_openid.consumer import CookieConsumer
+
+    class MyConsumer(CookieConsumer):
+        redirect_after_login = '/welcome/'
+        sreg = ['nickname', 'email', 'dob', 'postcode']
+    
+        base_template = 'path/to/base.html'
+
+    # Then in your settings.py
+
+    MIDDLEWARE_CLASSES = (
+        # ...
+        'django_openid.consumer.CookieConsumer',
+    )
+
+The CookieConsumer uses signed cookies to store the user's OpenID, including their sreg information. Unlike the SessionConsumer, the CookieConsumer only allows users to be signed in with one OpenID at a time. The middleware provides request.openid and request.openids properties that are identical to SessionConsumer, but request.openids will only ever contain 0 or 1 OpenID objects.
+
+======================================
+Using django_openid without a database
+======================================
+
+Under the hood, django_openid uses the JanRain OpenID library. This library needs to store book-keeping information about the current active OpenID request somewhere. By default, django_openid stores this in the database - that's why you need to run ./manage.py syncdb when you install it.
+
