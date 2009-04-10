@@ -22,5 +22,5 @@ class OpenID:
         return cls(
             openid = openid_response.identity_url,
             issued = datetime.datetime.now(),
-            reg = sreg.SRegResponse.fromSuccessResponse(openid_response),
+            sreg = sreg.SRegResponse.fromSuccessResponse(openid_response),
         )
