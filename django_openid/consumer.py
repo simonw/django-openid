@@ -10,7 +10,6 @@ urlpatterns = patterns('',
     ...
 )
 """
-from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render_to_response
 from openid.consumer import consumer
@@ -64,6 +63,14 @@ class CookieUserSessionMixin(object):
             )
 
 class Consumer(object):
+    """
+    This endpoint can take a user through the most basic OpenID flow, starting
+    with an "enter your OpenID" form, dealing with the redirect to the user's 
+    provider and calling self.on_success(...) once they've successfully 
+    authenticated. You should subclass this and provide your own on_success 
+    method, or use CookieConsumer or SessionConsumer if you just want to 
+    persist their OpenID in some way.
+    """
     # Default templates
     base_template = 'django_openid/base.html'
     login_template = 'django_openid/login.html'
@@ -283,6 +290,7 @@ Fzk0lpcjIQA7""".strip()
         })
     
     def do_debug(self, request):
+        from django.conf import settings
         if not settings.DEBUG:
             raise Http404
         assert False, 'debug!'
@@ -434,6 +442,7 @@ class CookieConsumer(CookieUserSessionMixin, LoginConsumer):
         return response
     
     def do_debug(self, request):
+        from django.conf import settings
         if not settings.DEBUG:
             raise Http404
         if self.cookie_key in request.COOKIES:

@@ -45,6 +45,9 @@ def dumps(obj, secret = None, compress = False, extra_salt = ''):
     If compress is True (not the default) checks if compressing using zlib can
     save some space. Prepends a '.' to signify compression. This is included 
     in the signature, to protect against zip bombs.
+    
+    extra_salt can be used to further salt the hash, in case you're worried 
+    that the NSA might try to brute-force your SHA-1 protected secret.
     """
     pickled = pickle.dumps(obj)
     is_compressed = False # Flag for if it's been compressed or not
