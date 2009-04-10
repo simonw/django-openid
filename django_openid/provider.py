@@ -5,7 +5,7 @@ from openid.server.server import Server
 from openid.extensions import sreg
 from django_openid.models import DjangoOpenIDStore
 from django_openid import signed
-from django_openid.response import RequestTemplateResponse
+from django_openid.response import TemplateResponse
 
 class Provider(object):
     """
@@ -29,7 +29,7 @@ class Provider(object):
     def render(self, request, template, context=None):
         context = context or {}
         context['base_template'] = self.base_template
-        return RequestTemplateResponse(request, template, context)
+        return TemplateResponse(request, template, context)
     
     def get_server(self, request):
         return Server(DjangoOpenIDStore())
