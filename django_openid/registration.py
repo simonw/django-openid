@@ -125,7 +125,7 @@ class RegistrationConsumer(AuthConsumer):
                 no_duplicate_emails = self.no_duplicate_emails
             )
             if form.is_valid():
-                user = self.create_user(form.cleaned_data, openid)
+                user = self.create_user(request, form.cleaned_data, openid)
                 # Now log that new user in
                 self.log_in_user(request, user)
                 return self.on_registration_complete(request)
@@ -150,7 +150,7 @@ class RegistrationConsumer(AuthConsumer):
             'action': request.path,
         })
     
-    def create_user(self, data, openid=None):
+    def create_user(self, request, data, openid=None):
         from django.contrib.auth.models import User
         user = User.objects.create(
             username = data['username'],
