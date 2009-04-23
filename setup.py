@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-openid',
-    version='0.1.0',
+    version='0.1.1',
     description='OpenID tools for Django',
     author='Simon Willison',
     author_email='simon@simonwillison.net',
@@ -17,7 +17,16 @@ setup(
         'Programming Language :: Python',
         'Framework :: Django',
     ],
+    package_data = {
+        'django_openid': [
+            'docs/intro.txt',
+            'templates/django_openid/*.html'
+        ],
+        'django_openidconsumer': [
+            'templates/*.html',
+        ]
+    },
     include_package_data=True,
     zip_safe=False,
-    install_requires=['setuptools', 'python-openid'],
+    install_requires=['python-openid'],
 )
