@@ -27,7 +27,8 @@ class ConsumerTest(TestCase):
         post.session = MockSession()
         response = openid_consumer(post)
         self.assertEqual(response['Location'], 'http://url-of-openid-server/')
-        self.assert_('openid_bits' in post.session)
+        oid_session = signed.loads(response.cookies['o_user_session'].value)
+        self.assert_('openid_bits' in oid_session)
     
     def testLoginDiscoverFail(self):
         "E.g. the user enters an invalid URL"
@@ -49,8 +50,8 @@ class ConsumerTest(TestCase):
         get = rf.get('/openid/complete/', {'openid-args': 'go-here'})
         get.session = MockSession()
         response = openid_consumer(get, 'complete/')
-        self.assertEqual(
-            response.content, 'You logged in as http://simonwillison.net/'
+        self.assert_(
+            'You logged in as http://simonwillison.net/' in response.content
         )
     
     def testLoginNext(self):

@@ -4,6 +4,7 @@ communicating with an external service.
 """
 from django_openid.consumer import Consumer, SessionConsumer, CookieConsumer
 from django_openid.auth import AuthConsumer
+from openid.message import Message
 
 class MockSession(dict):
     def __init__(self, **kwargs):
@@ -21,9 +22,9 @@ class MockOpenIDResponse(object):
     def __init__(self, status, identity_url):
         self.status = status
         self.identity_url = identity_url
-        self.message = 'Message'
+        self.message = Message()
     
-    def extensionResponse(self, *args):
+    def getSignedNS(self, *args):
         return {}
 
 class MockConsumer(object):
