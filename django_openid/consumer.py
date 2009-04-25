@@ -20,15 +20,16 @@ from django_openid.utils import OpenID
 from django_openid import signed
 from django_openid.response import TemplateResponse
 
-class SessionUserSessionMixin(object):
+class SessionPersist(object):
     def get_user_session(self, request):
         return request.session
+    
     def set_user_session(self, request, response, user_session):
         pass
 
-class CookieUserSessionMixin(object):
+class CookiePersist(object):
     """
-    Use this mixin if you are avoiding Django's session support entirely.
+    Use this if you are avoiding Django's session support entirely.
     """
     cookie_user_session_key = 'o_user_session'
     cookie_user_session_path = '/'
@@ -109,6 +110,9 @@ R0lGODlhEAAQAMQAAO3t7eHh4srKyvz8/P5pDP9rENLS0v/28P/17tXV1dHEvPDw8M3Nzfn5+d3d
 AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
 EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
 Fzk0lpcjIQA7""".strip()
+    
+    def __init__(self, persist_class=CookiePersist):
+        self.persist = persist_class()
     
     def sign_next(self, url):
         return signed.dumps(url, extra_salt = self.salt_next)
@@ -234,7 +238,7 @@ Fzk0lpcjIQA7""".strip()
         if self.is_xri(user_url) and not self.xri_enabled:
             return self.show_login(request, self.xri_disabled_message)
         
-        user_session = self.get_user_session(request)
+        user_session = self.persist.get_user_session(request)
         
         try:
             auth_request = self.get_consumer(
@@ -250,17 +254,11 @@ Fzk0lpcjIQA7""".strip()
         
         redirect_url = auth_request.redirectURL(trust_root, on_complete_url)
         response = HttpResponseRedirect(redirect_url)
-        self.set_user_session(request, response, user_session)
+        self.persist.set_user_session(request, response, user_session)
         return response
-    
-    def get_user_session(self, request):
-        return request.session
-    
-    def set_user_session(self, request, response, user_session):
-        pass
-    
+        
     def dispatch_openid_complete(self, request, handlers):
-        user_session = self.get_user_session(request)
+        user_session = self.persist.get_user_session(request)
         
         openid_response = self.get_consumer(
             request, user_session
@@ -277,7 +275,7 @@ Fzk0lpcjIQA7""".strip()
                 request, openid_response
             )
         
-        self.set_user_session(request, response, user_session)
+        self.persist.set_user_session(request, response, user_session)
         
         return response
     
@@ -308,8 +306,8 @@ Fzk0lpcjIQA7""".strip()
     def on_success(self, request, identity_url, openid_response):
         response = self.redirect_if_valid_next(request)
         if not response:
-            response = HttpResponse(
-                "You logged in as %s" % identity_url
+            response = self.show_message(
+                request, 'Logged in', "You logged in as %s" % identity_url
             )
         return response
     
@@ -366,6 +364,9 @@ class SessionConsumer(LoginConsumer):
     """
     session_key = 'openids'
     
+    def __init__(self):
+        return super(SessionConsumer, self).__init__(SessionPersist)
+    
     def persist_openid(self, request, response, openid_object):
         if self.session_key not in request.session.keys():
             request.session[self.session_key] = []
@@ -402,7 +403,7 @@ class SessionConsumer(LoginConsumer):
                 request.openid = None
             request.openids = request.session[self.session_key]
 
-class CookieConsumer(CookieUserSessionMixin, LoginConsumer):
+class CookieConsumer(LoginConsumer):
     """
     When the user logs in, save their OpenID details in a signed cookie. To 
     avoid cookies getting too big, this endpoint only stores the most 
