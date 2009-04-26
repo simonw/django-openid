@@ -37,8 +37,6 @@ class CookiePersist(object):
     cookie_user_session_secure = None
     
     def get_user_session(self, request):
-        # By default Consumer uses Django sessions; here we over-ride so it 
-        # works using signed cookies instead.
         try:
             user_session = signed.loads(
                 request.COOKIES.get(self.cookie_user_session_key, '')
