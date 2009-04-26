@@ -373,8 +373,7 @@ class AuthConsumer(consumer.SessionConsumer):
             'associate_url': urljoin(request.path, '../../associations/'),
             'user': user,
         })
-    
-    do_r.accepts_rest_of_path = True
+    do_r.urlregex = '^r/([\w.]+)/$'
     
     def generate_recovery_code(self, user):
         # Code is {hex-days}.{hex-userid}.{signature}

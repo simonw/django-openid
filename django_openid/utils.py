@@ -24,3 +24,38 @@ class OpenID:
             issued = datetime.datetime.now(),
             sreg = sreg.SRegResponse.fromSuccessResponse(openid_response),
         )
+
+"""
+Convenient wrapper around Django's urlresolvers, allowing them to be used 
+from normal application code.
+
+from django.http import HttpResponse
+from django_openid.request_factory import RequestFactory
+from django.conf.urls.defaults import url
+router = Router(
+    url('^foo/$', lambda r: HttpResponse('foo'), name='foo'),
+    url('^bar/$', lambda r: HttpResponse('bar'), name='bar')
+)
+rf = RequestFactory()
+print router(rf.get('/bar/'))
+"""
+
+from django.conf.urls.defaults import patterns
+from django.core import urlresolvers
+
+class Router(object):
+    def __init__(self, *urlpairs):
+        self.urlpatterns = patterns('', *urlpairs)
+        self.resolver = urlresolvers.RegexURLResolver(r'^/', self)
+    
+    def handle(self, request, path_override=None):
+        if path_override is not None:
+            path = path_override
+        else:
+            path = request.path_info
+        path = '/' + path # Or it doesn't work
+        callback, callback_args, callback_kwargs = self.resolver.resolve(path)
+        return callback(request, *callback_args, **callback_kwargs)
+    
+    def __call__(self, request, path_override=None):
+        return self.handle(request, path_override)

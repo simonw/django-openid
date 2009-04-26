@@ -16,7 +16,7 @@ from openid.consumer import consumer
 from openid.consumer.discover import DiscoveryFailure
 from openid.yadis import xri
 from django_openid.models import DjangoOpenIDStore
-from django_openid.utils import OpenID
+from django_openid.utils import OpenID, Router
 from django_openid import signed
 from django_openid.response import TemplateResponse
 
@@ -109,6 +109,8 @@ AAAALAAAAAAQABAAAAVq4CeOZGme6KhlSDoexdO6H0IUR+otwUYRkMDCUwIYJhLFTyGZJACAwQcg
 EAQ4kVuEE2AIGAOPQQAQwXCfS8KQGAwMjIYIUSi03B7iJ+AcnmclHg4TAh0QDzIpCw4WGBUZeikD
 Fzk0lpcjIQA7""".strip()
     
+    urlname_pattern = 'openid-%s'
+    
     def __init__(self, persist_class=CookiePersist):
         self.persist = persist_class()
     
@@ -120,32 +122,39 @@ Fzk0lpcjIQA7""".strip()
         context['base_template'] = self.base_template
         return TemplateResponse(request, template, context)
     
+    def get_urlpatterns(self):
+        # Default behaviour is to introspect self for do_* methods
+        from django.conf.urls.defaults import url 
+        urlpatterns = []
+        for method in dir(self):
+            if method.startswith('do_'):
+                callback = getattr(self, method)
+                name = method.replace('do_', '')
+                urlname = self.urlname_pattern % name
+                urlregex = getattr(callback, 'urlregex', '^%s/$' % name)
+                urlpatterns.append(
+                    url(urlregex, callback, name=urlname)
+                )
+        return urlpatterns
+    
+    def get_urls(self):
+        # In Django 1.1 and later you can hook this in to your urlconf
+        from django.conf.urls.defaults import patterns
+        return patterns('', *self.get_urlpatterns())
+    
+    def urls(self):
+        return self.get_urls()
+    urls = property(urls)
+    
     def __call__(self, request, rest_of_url=''):
         if not request.path.endswith('/'):
             return HttpResponseRedirect(request.path + '/')
-        
-        # Dispatch based on path component
-        bits = rest_of_url.split('/')
-        part = bits[0]
-        rest = '/'.join(bits[1:])
-        
-        if not part:
-            return self.do_index(request)
-        
-        if not hasattr(self, 'do_%s' % part):
-            raise Http404, 'No do_%s method' % part
-        
-        method = getattr(self, 'do_%s' % part)
-        
-        if getattr(method, 'accepts_rest_of_path', False):
-            return method(request, rest or '')
-        elif rest:
-            raise Http404, 'URL had extra unwanted stuff on it'
-        else:
-            return method(request)
-    
+        router = Router(*self.get_urlpatterns())
+        return router(request, path_override = rest_of_url)
+
     def do_index(self, request, extra_message=None):
         return self.do_login(request, extra_message)
+    do_index.urlregex = '^$'
     
     def show_login(self, request, message=None):
         try:
