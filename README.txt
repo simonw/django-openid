@@ -1,6 +1,11 @@
-Caution: Work in Progress
-=========================
+django_openid
+=============
 
-The django_openid/ directory contains a brand new version of the django_openid
-library, rewritten from the ground up to use newforms-admin style class based
-generic views. It is NOT READY yet - it is still under active development.
+A new take on Django/OpenID integration, making extensive use of class-based 
+views.
+
+Caution: Work in Progress
+
+It's not ready yet! However, you are welcome to dive in to the code or take a 
+look at the in-progress documentation in django_openid/docs (which can be 
+built using Sphinx).
