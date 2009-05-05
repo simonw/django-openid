@@ -115,4 +115,4 @@ def unsign(signed_value, key = None):
         raise BadSignature, 'Signature failed: %s' % sig
 
 def base64_sha1(s):
-    return encode(sha1_constructor(s).digest())
+    return encode(sha_constructor(s).digest())
