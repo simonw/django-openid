@@ -32,7 +32,8 @@ class Provider(object):
         return TemplateResponse(request, template, context)
     
     def get_server(self, request):
-        return Server(DjangoOpenIDStore())
+        url = request.build_absolute_uri(request.path)
+        return Server(DjangoOpenIDStore(), op_endpoint=url)
     
     def user_is_logged_in(self, request):
         return False
