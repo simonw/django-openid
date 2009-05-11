@@ -1,0 +1,89 @@
+Understanding the registration flow
+===================================
+
+The full flow for a site that offers login and registration using either 
+OpenID or a regular username/password account can be quite complicated. This 
+page shows how the flow implemented by django-openid works.
+
+Login
+-----
+
+- With Username and Password:
+    - (has link to switch to OpenID)
+    - Incorrect login:
+        - They get their username wrong:
+            - "wrong username" message (defaults to same as wrong password)
+        - They get their password wrong:
+            - "wrong password" message
+    - Correct login:
+        - Have they verified their e-mail address?
+            - Yes:
+                - Log them in to that account.
+            - No:
+                - Tell them to verify their e-mail address
+                - Option: send me that e-mail again
+- With OpenID:
+    - (has link to switch to username/password)
+    - OpenID is invalid or authentication fails:
+        - Tell them what happened, don't log them in
+        - Show login or register UI
+    - OpenID is valid and corresponds to an existing account:
+        - Have they verified their e-mail address?
+            - Yes:
+                - Log them in to that account.
+            - No:
+                - Tell them to verify their e-mail address
+                - Option: send me that e-mail again
+    - OpenID is valid but does not correspond to an existing account:
+        - Tell them, and offer a link to the registration form.              
+
+Registration
+------------
+
+- Register with username/password:
+    - Username/e-mail/password please
+    - Repeat until valid
+    - Send verification e-mail
+    - Tell them "just one more step: click link in your e-mail"
+- Register with OpenID:
+    - Enter your OpenID:
+        - OpenID is valid:
+            - And not associated with existing account:
+                - Show registration form, pre-filled with any details from OpenID provider
+            - And associated with existing account:
+                - Log them in - jump to "have they verified their e-mail address" bit in login with OpenID flow
+        - OpenID is invalid:
+            - Tell them what happened, link to login page
+
+E-mail verification link clicked
+--------------------------------
+
+- Is verification code valid?
+    - Yes:
+        - Mark that account as verified
+        - Log them straight in to that account
+    - No:
+        - Tell them it's invalid.
+        - Provide a link to the homepage.
+
+Recover account flow
+--------------------
+
+- Ask them for their:
+    - E-mail address
+    - or Username
+    - or OpenID
+- If valid information:
+    - Send them an e-mail with a magic log-you-in link in it
+- If invalid:
+    - Tell them no account found.
+    - Show form again.
+
+Recover link clicked
+--------------------
+
+- If valid:
+    - Log them in
+    - Optionally show a reset-your-password screen
+- If invalid:
+    - Tell them to go away, link to homepage

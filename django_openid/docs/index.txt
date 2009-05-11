@@ -12,6 +12,8 @@ django_openid
    accepting-openid
    
    api/index
+   
+   registration-flow
 
 ========
 Features
