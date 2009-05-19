@@ -116,7 +116,7 @@ class Provider(object):
                 request.POST.get('orequest', ''), self.secret_key
             )
         except ValueError:
-            return self.show_error(self.invalid_decide_post_message)
+            return self.show_error(request, self.invalid_decide_post_message)
         
         they_said_yes = bool(
             ('yes_once' in request.POST) or

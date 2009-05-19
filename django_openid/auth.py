@@ -249,7 +249,7 @@ class AuthConsumer(consumer.SessionConsumer):
         return response
     
     def need_authenticated_user(self, request):
-        return self.show_error(self.need_authenticated_user_message)
+        return self.show_error(request, self.need_authenticated_user_message)
     
     def do_associations(self, request):
         "Interface for managing your account's associated OpenIDs"
