@@ -67,8 +67,8 @@ class AuthConsumer(consumer.SessionConsumer):
         )
         
         if self.password_logins_enabled:
-            response.template = self.login_plus_password_template
-            response.context.update({
+            response.template_name = self.login_plus_password_template
+            response.template_context.update({
                 'account_recovery': self.account_recovery_enabled and (
                     self.account_recovery_url or (request.path + 'recover/')
                 ),
