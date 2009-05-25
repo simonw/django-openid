@@ -100,11 +100,30 @@ class ChangePasswordForm(forms.Form):
         label = 'Confirm password'
     )
     password_mismatch_error = 'Your passwords do not match'
-    password_incorrect_error = 'Your password is incorrect'
     
     def __init__(self, user, *args, **kwargs):
         self.user = user
         super(ChangePasswordForm, self).__init__(*args, **kwargs)
+    
+    def clean_password2(self):
+        password = self.cleaned_data.get('password', '')
+        password2 = self.cleaned_data.get('password2', '')
+        if password and (password != password2):
+            raise forms.ValidationError, self.password_mismatch_error
+        return password2
+
+class ChangePasswordVerifyOldForm(ChangePasswordForm):
+    """
+    Use this if you want the user to enter their old password first
+    
+    Careful though... if hte user has just recovered their account, they
+    should be able to reset their password without having to enter the old
+    one. This case is not currently handled.
+    """
+    password_incorrect_error = 'Your password is incorrect'
+    
+    def __init__(self, *args, **kwargs):
+        super(ChangePasswordVerifyOldForm, self).__init__(*args, **kwargs)
         if self.user.has_usable_password() and self.user.password:
             # Only ask for their old password if they have set it already
             self.fields['old_password'] = forms.CharField(
@@ -116,10 +135,3 @@ class ChangePasswordForm(forms.Form):
         password = self.cleaned_data.get('old_password', '')
         if not self.user.check_password(password):
             raise forms.ValidationError, self.password_incorrect_error
-    
-    def clean_password2(self):
-        password = self.cleaned_data.get('password', '')
-        password2 = self.cleaned_data.get('password2', '')
-        if password and (password != password2):
-            raise forms.ValidationError, self.password_mismatch_error
-        return password2
