@@ -2,6 +2,9 @@ from openid.extensions import sreg
 from openid.yadis import xri
 import datetime
 
+hex_to_int = lambda s: int(s, 16)
+int_to_hex = lambda i: hex(i).replace('0x', '').lower().replace('l', '')
+
 class OpenID:
     def __init__(self, openid, issued, sreg=None):
         self.openid = openid

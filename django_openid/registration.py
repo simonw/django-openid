@@ -1,7 +1,10 @@
 from django.http import HttpResponseRedirect
+from django.core.mail import send_mail
+from django.conf import settings
 
 from django_openid.auth import AuthConsumer
-from django_openid.utils import OpenID
+from django_openid.utils import OpenID, int_to_hex, hex_to_int
+from django_openid import signed
 from django_openid import forms
 
 from openid.consumer import consumer
@@ -12,23 +15,48 @@ class RegistrationConsumer(AuthConsumer):
     already_signed_in_message = 'You are already signed in to this site'
     unknown_openid_message = \
         'That OpenID is not recognised. Would you like to create an account?'
-    registration_complete_message = 'Your account has been created'
+    c_already_confirmed_message = 'Your account is already confirmed'
     
     register_template = 'django_openid/register.html'
     set_password_template = 'django_openid/set_password.html'
+    confirm_email_template = 'django_openid/register_confirm_email.txt'
+    register_email_sent_template = 'django_openid/register_email_sent.html'
+    register_complete_template = 'django_openid/register_complete.html'
     
     after_registration_url = None # None means "show a message instead"
+    unconfirmed_group = 'Unconfirmed users'
     
     # Registration options
-    validate_email_address = True
-    no_duplicate_emails = True
     reserved_usernames = ['security', 'info', 'admin']
+    no_duplicate_emails = True    
+    confirm_email_addresses = True
+    
+    confirm_email_from = None # If None, uses settings.DEFAULT_FROM_EMAIL
+    confirm_email_subject = 'Confirm your e-mail address'
+    confirm_link_secret = None
+    confirm_link_salt = 'confirm-link-salt'
     
     # sreg
     sreg = ['nickname', 'email', 'fullname']
     
     RegistrationForm = forms.RegistrationFormPasswordConfirm
     ChangePasswordForm = forms.ChangePasswordForm
+    
+    def user_is_confirmed(self, user):
+        return not self.user_is_unconfirmed(user)
+    
+    def user_is_unconfirmed(self, user):
+        return user.groups.filter(name = self.unconfirmed_group).count()
+    
+    def mark_user_unconfirmed(self, user):
+        from django.contrib.auth.models import Group
+        user.is_active = False
+        user.save()
+        group, _ = Group.objects.get_or_create(name = self.unconfirmed_group)
+        user.groups.add(group)
+    
+    def mark_user_confirmed(self, user):
+        user.groups.filter(name = self.unconfirmed_group).delete()
     
     def get_registration_form_class(self, request):
         return self.RegistrationForm
@@ -85,10 +113,7 @@ class RegistrationConsumer(AuthConsumer):
         if self.after_registration_url:
             return HttpResponseRedirect(self.after_registration_url)
         else:
-            return self.show_message(
-                request, 'Registration complete', 
-                self.registration_complete_message
-            )
+            return self.render(request, self.register_complete_template)
     
     def do_register(self, request, message=None):
         # Show a registration / signup form, provided the user is not 
@@ -126,9 +151,11 @@ class RegistrationConsumer(AuthConsumer):
             )
             if form.is_valid():
                 user = self.create_user(request, form.cleaned_data, openid)
-                # Now log that new user in
-                self.log_in_user(request, user)
-                return self.on_registration_complete(request)
+                if self.confirm_email_addresses:
+                    return self.confirm_email_step(request, user)
+                else:
+                    self.log_in_user(request, user)
+                    return self.on_registration_complete(request)
         else:
             form = RegistrationForm(
                 initial = request.openid and self.initial_from_sreg(
@@ -149,6 +176,66 @@ class RegistrationConsumer(AuthConsumer):
             'no_thanks': self.sign_next(request.path),
             'action': request.path,
         })
+    
+    def confirm_email_step(self, request, user):
+        self.mark_user_unconfirmed(user)
+        self.send_confirm_email(request, user)
+        return self.render(request, self.register_email_sent_template, {
+            'email': user.email,
+        })
+    
+    def generate_confirm_code(self, user):
+        return signed.sign(int_to_hex(user.id), key = (
+            self.confirm_link_secret or settings.SECRET_KEY
+        ) + self.confirm_link_salt)
+    
+    def send_confirm_email(self, request, user):
+        from_email = self.confirm_email_from or settings.DEFAULT_FROM_EMAIL
+        code = self.generate_confirm_code(user)
+        path = urlparse.urljoin(request.path, '../c/%s/' % code)
+        url = request.build_absolute_uri(path)
+        send_mail(
+            subject = self.confirm_email_subject,
+            message = self.render(request, self.confirm_email_template, {
+                'url': url,
+                'code': code,
+                'user': user,
+            }).content,
+            from_email = from_email,
+            recipient_list = [user.email]
+        )
+    
+    def do_c(self, request, token = ''):
+        if not token:
+            # TODO: show a form where they can paste in their token?
+            raise Http404
+        token = token.rstrip('/').encode('utf8')
+        try:
+            value = signed.unsign(token, key = (
+                self.confirm_link_secret or settings.SECRET_KEY
+            ) + self.confirm_link_salt)
+        except signed.BadSignature:
+            return self.show_message(
+                request, self.invalid_token_message,
+                self.invalid_token_message + ': ' + token
+            )
+        user_id = hex_to_int(value)
+        user = self.lookup_user_by_id(user_id)
+        if not user: # Maybe the user was deleted?
+            return self.show_error(request, r_user_not_found_message)
+        
+        # Check user is NOT active but IS in the correct group
+        if self.user_is_unconfirmed(user):
+            # Confirm them
+            user.is_active = True
+            user.save()
+            self.mark_user_confirmed(user)
+            self.log_in_user(request, user)
+            return self.on_registration_complete(request)
+        else:
+            return self.show_error(request, c_already_confirmed_message)
+    
+    do_c.urlregex = '^c/([\w.]+)/$'
     
     def create_user(self, request, data, openid=None):
         from django.contrib.auth.models import User
