@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.test.client import Client
 from django.http import Http404
+from django.conf import settings
+
 from django_openid.registration import RegistrationConsumer
 from django_openid import signed
 
@@ -17,6 +19,15 @@ class AuthTest(TestCase):
     urls = 'django_openid.tests.auth_test_urls'
     
     def setUp(self):
+        # Monkey-patch in the correct middleware
+        self.old_middleware = settings.MIDDLEWARE_CLASSES
+        settings.MIDDLEWARE_CLASSES = (
+            'django.middleware.common.CommonMiddleware',
+            'django.contrib.sessions.middleware.SessionMiddleware',
+            'django.contrib.auth.middleware.AuthenticationMiddleware',
+            'django_openid.registration.RegistrationConsumer',
+        )
+        
         # Create user accounts associated with OpenIDs
         self.no_openids = User.objects.create(username = 'no-openids')
         self.no_openids.set_password('password')
@@ -28,9 +39,7 @@ class AuthTest(TestCase):
         self.two_openid.openids.create(openid = 'http://c.example.com/')
     
     def tearDown(self):
-        [user.delete() for user in User.objects.filter(username__in = (
-            'no-openids', 'one-openid', 'two-openids'
-        ))]
+        settings.MIDDLEWARE_CLASSES = self.old_middleware
     
     def testLoginWithPassword(self):
         response = self.client.post('/openid/login/', {
