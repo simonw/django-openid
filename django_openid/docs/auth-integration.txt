@@ -1,0 +1,53 @@
+Integrating with django.contrib.auth
+====================================
+
+The obvious next step with OpenID is to integrate it with Django's built-in concept of authentication, using the models from django.contrib.auth (in particular the User) model. The correct way of thinking about OpenID in this context is as an alternative to authenticating with a password. django_openid supports allowing users to associate 0 or more OpenIDs with a User account.
+
+Setting up auth integration
+---------------------------
+
+Auth integration is implemented using AuthConsumer, a subclass of Consumer. AuthConsumer adds the ability to associate OpenIDs with user accounts.
+
+If you want users to be able to register for new accounts on your site using their OpenID, you should use RegistrationConsumer instead. RegistrationConsumer subclasses AuthConsumer but adds a flow for registering new accounts.
+
+Here's how to set up AuthConsumer::
+
+    from django.conf.urls.defaults import *
+    from django_openid.registration import RegistrationConsumer
+    
+    urlpatterns = patterns('',
+        # ...
+        (r'^openid/(.*)', RegistrationConsumer()),
+        # ...
+    )
+
+If you are using Django 1.1, you can do the following instead::
+
+    from django.conf.urls.defaults import *
+    from django_openid.registration import RegistrationConsumer
+    
+    registration_consumer = Consumer()
+    
+    urlpatterns = patterns('',
+        (r'^openid/', include(registration_consumer.urls)),
+    )
+
+Using named URL patterns
+------------------------
+
+Using Django 1.1 and the include pattern shown above, URLs within the registration consumer will be exposed as named URL patterns. By default, the names will follow the pattern 'openid-ACTION' - but you can change this default if you like by over-riding the urlname_pattern property of your Consumer subclass.
+
+You can also provide names to specific patterns using the following idiom (which also works in Django 1.0)::
+
+    url(r'^account/register/$', registration_consumer, {
+        'rest_of_url': 'register/',
+    }, name = 'custom-register'),
+    url(r'^account/login/$', registration_consumer, {
+        'rest_of_url': 'login/',
+    }, name = 'custom-login'),
+    url(r'^account/logout/$', registration_consumer, {
+        'rest_of_url': 'logout/',
+    }, name = 'custom-logout'),
+    (r'^account/(.*?)$', registration_consumer),
+
+

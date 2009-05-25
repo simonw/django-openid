@@ -10,6 +10,7 @@ django_openid
    
    installation
    accepting-openid
+   auth-integration
    
    api/index
    
