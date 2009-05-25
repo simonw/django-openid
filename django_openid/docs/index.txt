@@ -14,6 +14,7 @@ django_openid
    api/index
    
    registration-flow
+   design-notes
 
 ========
 Features

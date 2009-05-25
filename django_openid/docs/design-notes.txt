@@ -1,0 +1,12 @@
+Design notes
+============
+
+The thoughts behind various aspects of the design of django-openid.
+
+Confirmation e-mails
+--------------------
+
+- Not all sites wish to implement a confirm-via-email loop (which can discourage people from signing up) so it should not be a compulsory feature.
+- People sometimes lose confirmation e-mails to spam filters and so forth - they need to be able to request that an e-mail is re-sent.
+- It's important to be able to distinguish between users who have not yet confirmed their account and users who have been banned. This means the is_active field on the User model is not enough information - a banned user could bypass it by re-requesting their confirmation e-mail.
+    - Solution: the "Unconfirmed users" group is used to mark accounts which have not yet been confirmed. Only accounts in that group are allowed to re-request confirmation e-mails.
