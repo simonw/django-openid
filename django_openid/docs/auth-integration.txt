@@ -50,4 +50,9 @@ You can also provide names to specific patterns using the following idiom (which
     }, name = 'custom-logout'),
     (r'^account/(.*?)$', registration_consumer),
 
+You can also use this idiom to apply decorators to individual paths within the Consumer::
+
+    url(r'^account/register/$', view_decorator(registration_consumer), {
+        'rest_of_url': 'register/',
+    }, name = 'custom-register'),
 
