@@ -3,8 +3,9 @@ from django.test.client import Client
 from django.http import Http404
 from django_openid.registration import RegistrationConsumer
 from django_openid import signed
-from django.contrib.auth.models import User
 
+from django.contrib.auth.models import User
+from django.utils.decorators import decorator_from_middleware
 from request_factory import RequestFactory
 from openid_mocks import *
 
@@ -13,6 +14,7 @@ from openid.consumer import consumer as janrain_consumer
 rf = RequestFactory()
 
 class AuthTest(TestCase):
+    urls = 'django_openid.tests.auth_test_urls'
     
     def setUp(self):
         # Create user accounts associated with OpenIDs
@@ -31,17 +33,15 @@ class AuthTest(TestCase):
         ))]
     
     def testLoginWithPassword(self):
-        client = Client()
-        response = client.post('/openid/login/', {
+        response = self.client.post('/openid/login/', {
             'username': 'no-openids',
             'password': 'incorrect-password',
         })
-        # Should get the login page again
-        self.assert_('login' in response.template_name)
-        
-        response = client.post('/openid/login/', {
+        self.assertEqual(
+            response.template_name, 'django_openid/login_plus_password.html'
+        )
+        response = self.client.post('/openid/login/', {
             'username': 'no-openids',
             'password': 'password',
         })
-        # Should be a redirect
-        self.assert_(response.has_header('Location'))
+        self.assertRedirects(response, '/')
