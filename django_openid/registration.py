@@ -233,7 +233,7 @@ class RegistrationConsumer(AuthConsumer):
             self.log_in_user(request, user)
             return self.on_registration_complete(request)
         else:
-            return self.show_error(request, c_already_confirmed_message)
+            return self.show_error(request, self.c_already_confirmed_message)
     
     do_c.urlregex = '^c/([^/]+)/$'
     

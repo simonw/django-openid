@@ -1,3 +1,8 @@
+# run "python -m smtpd -n -c DebuggingServer localhost:1025" to see outgoing
+# messages dumped to the terminal
+EMAIL_HOST = 'localhost'
+EMAIL_PORT = 1025
+
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
