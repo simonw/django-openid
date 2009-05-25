@@ -29,6 +29,7 @@ class AuthConsumer(consumer.SessionConsumer):
     recovery_complete_template = 'django_openid/recovery_complete.html'
     
     recovery_email_from = None
+    recovery_email_subject = 'Recover your account'
     
     password_logins_enabled = True
     account_recovery_enabled = True
@@ -43,6 +44,8 @@ class AuthConsumer(consumer.SessionConsumer):
     bad_password_message = 'Incorrect username or password'
     invalid_token_message = 'Invalid token'
     recovery_email_sent_message = 'Check your mail for further instructions'
+    recovery_not_found_message = 'No matching user was found'
+    recovery_multiple_found_message = 'Try entering your username instead'
     r_user_not_found_message = 'That user account does not exist'
     
     account_recovery_url = None
@@ -303,7 +306,7 @@ class AuthConsumer(consumer.SessionConsumer):
                 users = self.lookup_users_by_email(submitted)
                 if users:
                     if len(users) > 1:
-                        extra_message = 'Try entering your username instead'
+                        extra_message = self.recovery_multiple_found_message
                         user = None
                     else:
                         user = users[0]
@@ -312,6 +315,8 @@ class AuthConsumer(consumer.SessionConsumer):
                 return self.show_message(
                     request, 'E-mail sent', self.recovery_email_sent_message
                 )
+            else:
+                extra_message = self.recovery_not_found_message
         return self.render(request, self.recover_template, {
             'action': request.path,
             'message': extra_message,
@@ -371,7 +376,7 @@ class AuthConsumer(consumer.SessionConsumer):
             'associate_url': urljoin(request.path, '../../associations/'),
             'user': user,
         })
-    do_r.urlregex = '^r/([\w.]+)/$'
+    do_r.urlregex = '^r/([^/]+)/$'
     
     def generate_recovery_code(self, user):
         # Code is {hex-days}.{hex-userid}.{signature}
@@ -392,7 +397,7 @@ class AuthConsumer(consumer.SessionConsumer):
             'code': code,
             'user': user,
         }).content
-        send_email(
+        send_mail(
             subject = self.recovery_email_subject,
             message = email_body,
             from_email = self.recovery_email_from or \

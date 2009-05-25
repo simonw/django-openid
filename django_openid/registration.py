@@ -235,7 +235,7 @@ class RegistrationConsumer(AuthConsumer):
         else:
             return self.show_error(request, c_already_confirmed_message)
     
-    do_c.urlregex = '^c/([\w.]+)/$'
+    do_c.urlregex = '^c/([^/]+)/$'
     
     def create_user(self, request, data, openid=None):
         from django.contrib.auth.models import User

@@ -30,7 +30,10 @@ class AuthTestBase(TestCase):
         )
         
         # Create user accounts associated with OpenIDs
-        self.no_openids = User.objects.create(username = 'noopenids')
+        self.no_openids = User.objects.create(
+            username = 'noopenids',
+            email = 'noopenids@example.com'
+        )
         self.no_openids.set_password('password')
         self.no_openids.save()
         self.one_openid = User.objects.create(username = 'oneopenid')
@@ -99,9 +102,10 @@ class RegistrationTest(AuthTestBase):
         self.assertEqual(len(mail.outbox), 1)
         
         # Now extract and click that link
-        body = mail.outbox[0].body
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, [u'test@example.com'])
         link = [
-            l.strip() for l in body.splitlines()
+            l.strip() for l in msg.body.splitlines()
             if l.startswith('http://testserver/')
         ][0]
         response = self.client.get(link)
@@ -114,3 +118,47 @@ class RegistrationTest(AuthTestBase):
         self.assertEqual(
             user.groups.filter(name = 'Unconfirmed users').count(), 0
         )
+
+class AccountRecoveryTest(AuthTestBase):
+    
+    def testRecoverAccountBadUsername(self):
+        response = self.client.get('/openid/recover/')
+        self.assertEqual(
+            response.template_name, 'django_openid/recover.html'
+        )
+        response = self.client.post('/openid/recover/', {
+            'recover': 'does-not-exist'
+        })
+        self.assertEqual(
+            response.template_context['message'],
+            RegistrationConsumer.recovery_not_found_message
+        )
+        
+    def testRecoverAccountByUsername(self):
+        self.assertEqual(len(mail.outbox), 0)
+        response = self.client.post('/openid/recover/', {
+            'recover': 'noopenids'
+        })
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, [u'noopenids@example.com'])
+        link = [
+            l.strip() for l in msg.body.splitlines()
+            if l.startswith('http://testserver/')
+        ][0]
+        
+        # Tampering with the link should cause it to fail
+        bits = link.split('.')
+        bits[-1] = 'X' + bits[-1]
+        tampered = '.'.join(bits)
+        response = self.client.get(tampered)
+        self.assert_('Invalid token' in str(response))
+        self.assertNotEqual(
+            response.template_name, 'django_openid/recovery_complete.html'
+        )
+        # Following that link should log us in
+        response = self.client.get(link)
+        self.assertEqual(
+            response.template_name, 'django_openid/recovery_complete.html'
+        )
+
