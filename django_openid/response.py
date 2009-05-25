@@ -67,7 +67,10 @@ class SimpleTemplateResponse(HttpResponse):
 class TemplateResponse(SimpleTemplateResponse):
     
     def __init__(self, request, template, context, *args, **kwargs):
-        self.request = request
+        # self.request gets over-written by django.test.client.Client - and 
+        # unlike template_context and template_name the _request should not 
+        # be considered part of the public API.
+        self._request = request
         super(TemplateResponse, self).__init__(
             template, context, *args, **kwargs
         )
@@ -76,7 +79,7 @@ class TemplateResponse(SimpleTemplateResponse):
         if isinstance(context, Context):
             return context
         else:
-            return RequestContext(self.request, context)
+            return RequestContext(self._request, context)
 
 # Even less verbose alias:
 render = TemplateResponse

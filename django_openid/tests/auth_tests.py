@@ -161,4 +161,6 @@ class AccountRecoveryTest(AuthTestBase):
         self.assertEqual(
             response.template_name, 'django_openid/recovery_complete.html'
         )
+        self.assertEqual(response._request.user.username, 'noopenids')
+
 
