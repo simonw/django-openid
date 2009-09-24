@@ -37,6 +37,7 @@ These functions make use of all of them.
 import pickle, base64
 from django.conf import settings
 from django.utils.hashcompat import sha_constructor
+import hmac
 
 def dumps(obj, secret = None, compress = False, extra_salt = ''):
     """
@@ -99,7 +100,7 @@ def sign(value, key = None):
             'sign() needs bytestring, not unicode: %s' % repr(value)
     if key is None:
         key = settings.SECRET_KEY
-    return value + '.' + base64_sha1(value + key)
+    return value + '.' + base64_hmac(value, key)
 
 def unsign(signed_value, key = None):
     if isinstance(signed_value, unicode):
@@ -109,10 +110,10 @@ def unsign(signed_value, key = None):
     if not '.' in signed_value:
         raise BadSignature, 'Missing sig (no . found in value)'
     value, sig = signed_value.rsplit('.', 1)
-    if base64_sha1(value + key) == sig:
+    if base64_hmac(value, key) == sig:
         return value
     else:
         raise BadSignature, 'Signature failed: %s' % sig
 
-def base64_sha1(s):
-    return encode(sha_constructor(s).digest())
+def base64_hmac(value, key):
+    return encode(hmac.new(key, value, sha_constructor).digest())

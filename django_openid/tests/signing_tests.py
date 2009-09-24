@@ -15,11 +15,11 @@ class TestSignUnsign(TestCase):
         s = 'This is a string'
         self.assertEqual(
             signed.sign(s),
-            s + '.' + signed.base64_sha1(s + settings.SECRET_KEY)
+            s + '.' + signed.base64_hmac(s, settings.SECRET_KEY)
         )
         self.assertEqual(
             signed.sign(s, 'sekrit'),
-            s + '.' + signed.base64_sha1(s + 'sekrit')
+            s + '.' + signed.base64_hmac(s, 'sekrit')
         )
     
     def sign_is_reversible(self):
