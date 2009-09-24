@@ -115,7 +115,7 @@ Fzk0lpcjIQA7""".strip()
         self.persist = persist_class()
     
     def sign_next(self, url):
-        return signed.dumps(url, extra_salt = self.salt_next)
+        return signed.dumps(url, extra_key = self.salt_next)
     
     def render(self, request, template, context=None):
         context = context or {}
@@ -159,7 +159,7 @@ Fzk0lpcjIQA7""".strip()
     def show_login(self, request, message=None):
         try:
             next = signed.loads(
-                request.REQUEST.get('next', ''), extra_salt=self.salt_next
+                request.REQUEST.get('next', ''), extra_key=self.salt_next
             )
         except ValueError:
             next = ''
@@ -207,7 +207,7 @@ Fzk0lpcjIQA7""".strip()
         on_complete_url = self.ensure_absolute_url(request, on_complete_url)
         try:
             next = signed.loads(
-                request.POST.get('next', ''), extra_salt=self.salt_next
+                request.POST.get('next', ''), extra_key=self.salt_next
             )
         except ValueError:
             return on_complete_url
@@ -304,7 +304,7 @@ Fzk0lpcjIQA7""".strip()
         "Logic for checking if a signed ?next= token is included in request"
         try:
             next = signed.loads(
-                request.REQUEST.get('next', ''), extra_salt=self.salt_next
+                request.REQUEST.get('next', ''), extra_key=self.salt_next
             )
             return HttpResponseRedirect(next)
         except ValueError:
@@ -435,7 +435,7 @@ class CookieConsumer(LoginConsumer):
         response.set_cookie(
             key = self.cookie_key,
             value = signed.dumps(
-                openid_object, compress = True, extra_salt = self.extra_salt
+                openid_object, compress = True, extra_key = self.extra_salt
             ),
             max_age = self.cookie_max_age,
             expires = self.cookie_expires,
@@ -455,7 +455,7 @@ class CookieConsumer(LoginConsumer):
             raise Http404
         if self.cookie_key in request.COOKIES:
             obj = signed.loads(
-                request.COOKIES[self.cookie_key], extra_salt = self.extra_salt
+                request.COOKIES[self.cookie_key], extra_key = self.extra_salt
             )
             assert False, (obj, obj.__dict__)
         assert False, 'no cookie named %s' % self.cookie_key
@@ -469,7 +469,7 @@ class CookieConsumer(LoginConsumer):
         if cookie_value:
             try:
                 request.openid = signed.loads(
-                    cookie_value, extra_salt = self.extra_salt
+                    cookie_value, extra_key = self.extra_salt
                 )
                 request.openids = [request.openid]
             except ValueError: # Signature failed

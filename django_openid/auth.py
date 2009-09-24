@@ -208,7 +208,7 @@ class AuthConsumer(consumer.SessionConsumer):
             return self.need_authenticated_user(request)
         try:
             next = signed.loads(
-                request.REQUEST.get('next', ''), extra_salt=self.salt_next
+                request.REQUEST.get('next', ''), extra_key=self.salt_next
             )
         except ValueError:
             next = ''
@@ -218,9 +218,9 @@ class AuthConsumer(consumer.SessionConsumer):
             'specific_openid': openid,
             'next': next and request.REQUEST.get('next', '') or None,
             'openid_token': signed.dumps(
-               # Use user.id as part of extra_salt to prevent attackers from
+               # Use user.id as part of extra_key to prevent attackers from
                # creating their own openid_token for use in CSRF attack
-               openid, extra_salt = self.associate_salt + str(request.user.id)
+               openid, extra_key = self.associate_salt + str(request.user.id)
             ),
         })
     
@@ -229,7 +229,7 @@ class AuthConsumer(consumer.SessionConsumer):
             try:
                 openid = signed.loads(
                     request.POST.get('openid_token', ''),
-                    extra_salt = self.associate_salt + str(request.user.id)
+                    extra_key = self.associate_salt + str(request.user.id)
                 )
             except signed.BadSignature:
                 return self.show_error(request, self.csrf_failed_message)
@@ -262,7 +262,7 @@ class AuthConsumer(consumer.SessionConsumer):
                 try:
                     todelete = signed.loads(
                         request.POST['todelete'],
-                        extra_salt = self.associate_delete_salt
+                        extra_key = self.associate_delete_salt
                     )
                     if todelete['user_id'] != request.user.id:
                         message = self.associate_tampering_message
@@ -285,7 +285,7 @@ class AuthConsumer(consumer.SessionConsumer):
                     'user_id': request.user.id,
                     'association_id': association.id,
                     'openid': association.openid,
-                }, extra_salt = self.associate_delete_salt),
+                }, extra_key = self.associate_delete_salt),
             })
         return self.render(request, self.associations_template, {
             'openids': openids,

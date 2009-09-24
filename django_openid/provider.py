@@ -69,7 +69,7 @@ class Provider(object):
     def stash_incomplete_orequest(self, request, response, orequest):
         response.set_cookie(
             self.incomplete_orequest_cookie_key, signed.dumps(
-                orequest, extra_salt = self.orequest_salt
+                orequest, extra_key = self.orequest_salt
             )
         )
     
@@ -137,7 +137,7 @@ class Provider(object):
         try:
             return signed.loads(request.COOKIES.get(
                 self.incomplete_orequest_cookie_key, ''
-            ), extra_salt = self.orequest_salt)
+            ), extra_key = self.orequest_salt)
         except signed.BadSignature:
             return None
     

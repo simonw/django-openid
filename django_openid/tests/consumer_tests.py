@@ -162,7 +162,7 @@ class CookieConsumerTest(TestCase):
         # Decrypt the cookie and check it's the right thing
         cookie = response.cookies['openid'].value
         openid = signed.loads(
-            cookie, extra_salt = MyCookieConsumer().extra_salt
+            cookie, extra_key = MyCookieConsumer().extra_salt
         )
         self.assertEqual(openid.openid, 'http://simonwillison.net/')
     
