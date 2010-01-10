@@ -395,7 +395,7 @@ class AuthConsumer(consumer.SessionConsumer):
         email_body = self.render(request, self.recovery_email_template, {
             'url': url,
             'code': code,
-            'user': user,
+            'theuser': user,
         }).content
         send_mail(
             subject = self.recovery_email_subject,
