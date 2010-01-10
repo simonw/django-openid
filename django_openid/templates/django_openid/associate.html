@@ -10,8 +10,7 @@
 <form action="{{ action }}" method="post">
 <p>
     <input type="hidden" name="openid_token" value="{{ openid_token }}">
-{% if next %}    <input type="hidden" name="next" value="{{ next }}">
-{% endif %}    <input type="submit" value="Associate">
+    <input type="submit" value="Associate">
 </p>
 </form>
 {% endblock %}

@@ -96,6 +96,7 @@ class Consumer(object):
     failure_message = 'Failure: %s'
     setup_needed_message = 'Setup needed'
     
+    sign_next_param = True # Set to False to disable signed ?next= URLs
     salt_next = 'salt-next-token' # Adds extra saltiness to the ?next= salt
     xri_enabled = False
     on_complete_url = None
@@ -115,7 +116,10 @@ Fzk0lpcjIQA7""".strip()
         self.persist = persist_class()
     
     def sign_next(self, url):
-        return signed.dumps(url, extra_key = self.salt_next)
+        if self.sign_next_param:
+            return signed.dumps(url, extra_key = self.salt_next)
+        else:
+            return url
     
     def render(self, request, template, context=None):
         context = context or {}
@@ -157,12 +161,15 @@ Fzk0lpcjIQA7""".strip()
     do_index.urlregex = '^$'
     
     def show_login(self, request, message=None):
-        try:
-            next = signed.loads(
-                request.REQUEST.get('next', ''), extra_key=self.salt_next
-            )
-        except ValueError:
-            next = ''
+        if self.sign_next_param:
+            try:
+                next = signed.loads(
+                    request.REQUEST.get('next', ''), extra_key=self.salt_next
+                )
+            except ValueError:
+                next = ''
+        else:
+            next = request.REQUEST.get('next', '')
         return self.render(request, self.login_template, {
             'action': request.path,
             'logo': self.logo_path or (request.path + 'logo/'),
@@ -205,12 +212,15 @@ Fzk0lpcjIQA7""".strip()
         on_complete_url = on_complete_url or self.on_complete_url or \
             (request.path + 'complete/')
         on_complete_url = self.ensure_absolute_url(request, on_complete_url)
-        try:
-            next = signed.loads(
-                request.POST.get('next', ''), extra_key=self.salt_next
-            )
-        except ValueError:
-            return on_complete_url
+        if self.sign_next_param:
+            try:
+                next = signed.loads(
+                    request.POST.get('next', ''), extra_key=self.salt_next
+                )
+            except ValueError:
+                return on_complete_url
+        else:
+            next = request.POST.get('next', '')
         
         if '?' not in on_complete_url:
             on_complete_url += '?next=' + self.sign_next(next)
@@ -302,13 +312,20 @@ Fzk0lpcjIQA7""".strip()
     
     def redirect_if_valid_next(self, request):
         "Logic for checking if a signed ?next= token is included in request"
-        try:
-            next = signed.loads(
-                request.REQUEST.get('next', ''), extra_key=self.salt_next
-            )
-            return HttpResponseRedirect(next)
-        except ValueError:
-            return None
+        if self.sign_next_param:
+            try:
+                next = signed.loads(
+                    request.REQUEST.get('next', ''), extra_key=self.salt_next
+                )
+                return HttpResponseRedirect(next)
+            except ValueError:
+                return None
+        else:
+            next = request.REQUEST.get('next', '')
+            if next.startswith('/'):
+                return HttpResponseRedirect(next)
+            else:
+                return None
     
     def on_success(self, request, identity_url, openid_response):
         response = self.redirect_if_valid_next(request)

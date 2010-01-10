@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-openid',
-    version='0.1.2',
+    version='0.1.3',
     description='OpenID tools for Django',
     author='Simon Willison',
     author_email='simon@simonwillison.net',
-    url='http://code.google.com/p/django-openid/',
+    url='http://github.com/simonw/django-openid/',
     packages=find_packages(),
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -206,17 +206,10 @@ class AuthConsumer(consumer.SessionConsumer):
         "Screen that offers to associate an OpenID with a user's account"
         if not request.user.is_authenticated():
             return self.need_authenticated_user(request)
-        try:
-            next = signed.loads(
-                request.REQUEST.get('next', ''), extra_key=self.salt_next
-            )
-        except ValueError:
-            next = ''
         return self.render(request, self.show_associate_template, {
             'action': urljoin(request.path, '../associate/'),
             'user': request.user,
             'specific_openid': openid,
-            'next': next and request.REQUEST.get('next', '') or None,
             'openid_token': signed.dumps(
                # Use user.id as part of extra_key to prevent attackers from
                # creating their own openid_token for use in CSRF attack
