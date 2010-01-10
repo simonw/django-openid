@@ -199,7 +199,7 @@ class RegistrationConsumer(AuthConsumer):
             message = self.render(request, self.confirm_email_template, {
                 'url': url,
                 'code': code,
-                'user': user,
+                'newuser': user,
             }).content,
             from_email = from_email,
             recipient_list = [user.email]
