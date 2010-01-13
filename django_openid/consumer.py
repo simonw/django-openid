@@ -212,6 +212,8 @@ Fzk0lpcjIQA7""".strip()
         on_complete_url = on_complete_url or self.on_complete_url or \
             (request.path + 'complete/')
         on_complete_url = self.ensure_absolute_url(request, on_complete_url)
+        return on_complete_url
+        
         if self.sign_next_param:
             try:
                 next = signed.loads(
