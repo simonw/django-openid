@@ -221,11 +221,10 @@ Fzk0lpcjIQA7""".strip()
                 return on_complete_url
         else:
             next = request.POST.get('next', '')
-        
         if '?' not in on_complete_url:
-            on_complete_url += '?next=' + self.sign_next(next)
+            on_complete_url += '?next=' + next
         else:
-            on_complete_url += '&next=' + self.sign_next(next)
+            on_complete_url += '&next=' + next
         return on_complete_url
     
     def get_trust_root(self, request, trust_root=None):
