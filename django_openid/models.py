@@ -1,10 +1,14 @@
 from django.db import models
 from django.conf import settings
-from django.utils.hashcompat import md5_constructor
+import hashlib
 from openid.store.interface import OpenIDStore
 import openid.store
 from openid.association import Association as OIDAssociation
 import time, base64
+
+
+md5_constructor = hashlib.md5
+
 
 class Nonce(models.Model):
     server_url = models.CharField(max_length=255)
