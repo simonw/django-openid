@@ -13,7 +13,7 @@ md5_constructor = hashlib.md5
 class Nonce(models.Model):
     server_url = models.CharField(max_length=255)
     timestamp = models.IntegerField()
-    salt = models.CharField(max_length=40)
+    salt = models.CharField(max_length=128)
     
     def __unicode__(self):
         return u"Nonce: %s for %s" % (self.salt, self.server_url)
